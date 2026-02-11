@@ -5547,7 +5547,64 @@ useEffect(() => {
         </div>
         )}
 
-        {/* BOX 2: Pool Share with FOMO Slider */}
+        {/* BOX 2: Recent FLR inflows by category */}
+        {user.lpPosition > 0 && !lockExpired && (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 14,
+          padding: 16,
+          marginBottom: 12
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Recent FLR Inflows</div>
+
+          {loadingInflowHistory ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
+          ) : inflowHistory.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {inflowHistory.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'rgba(0,0,0,0.25)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 10,
+                    padding: '10px 12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
+                        background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
+                        border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
+                        borderRadius: 999,
+                        padding: '2px 7px'
+                      }}
+                    >
+                      {item.category}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* BOX 3: Pool Share with FOMO Slider */}
         {user.lpPosition > 0 && !lockExpired && (
         <div style={{
           background: 'rgba(255,255,255,0.02)',
@@ -5660,64 +5717,6 @@ useEffect(() => {
               color: '#00ff88'
             }}
           >Add FLR →</button>
-        </div>
-        )}
-
-        {/* BOX 3: Recent FLR inflows by category */}
-        {user.lpPosition > 0 && !lockExpired && (
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 14,
-          padding: 16,
-          marginBottom: 12
-        }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Recent FLR Inflows</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>Pool history by source: PGS, FTSO, POND burn</div>
-
-          {loadingInflowHistory ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
-          ) : inflowHistory.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {inflowHistory.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: 'rgba(0,0,0,0.25)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: 10,
-                    padding: '10px 12px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
-                        background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
-                        border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
-                        borderRadius: 999,
-                        padding: '2px 7px'
-                      }}
-                    >
-                      {item.category}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
         )}
 
