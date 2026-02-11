@@ -69,6 +69,7 @@ export const ABIS = {
     'function totalPondStaked() view returns (uint256)',
     'function getPendingRewards(address user) view returns (uint256)',
     'function poolCap() view returns (uint256)',
+    'function minDeposit() view returns (uint256)',
     'function getPondRequired(uint256 wflrAmount) view returns (uint256)',
     'function totalDeposited(address) view returns (uint256)',
     'function totalFtsoRewardsClaimed() view returns (uint256)',

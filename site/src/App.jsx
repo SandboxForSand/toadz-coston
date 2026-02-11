@@ -1109,12 +1109,17 @@ useEffect(() => {
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
 
-      const stakeAmount = ethers.parseEther(amount.toString());
+      const inputBudget = ethers.parseEther(amount.toString());
+      if (inputBudget <= 0n) {
+        throw new Error('Enter an amount greater than 0.');
+      }
+
       const position = await toadzStake.positions(address);
       const hasActivePosition = position[0] > 0n;
       const currentTier = getLockTierFromMultiplier(position[4]);
       const selectedTier = Number.isInteger(Number(tier)) ? Number(tier) : currentTier;
       const lockTierToUse = hasActivePosition ? Math.max(currentTier, selectedTier) : selectedTier;
+      const minStakeAmount = await toadzStake.minDeposit().catch(() => ethers.parseEther('1'));
 
       // Calculate incremental POND requirement using unstaked balance only.
       const totalPondBalance = await pond.balanceOf(address);
@@ -1123,23 +1128,66 @@ useEffect(() => {
 
       const currentWflrStaked = position[0];
       const currentPondStaked = position[1];
-      const targetPondForStake = hasActivePosition
-        ? await toadzStake.getPondRequired(currentWflrStaked + stakeAmount)
-        : await toadzStake.getPondRequired(stakeAmount);
-      const additionalPondNeeded = hasActivePosition
-        ? (targetPondForStake > currentPondStaked ? targetPondForStake - currentPondStaked : 0n)
-        : targetPondForStake;
-      const pondToBuy = additionalPondNeeded > unstakedPond ? additionalPondNeeded - unstakedPond : 0n;
+      const evaluateStakePlan = async (candidateStakeAmount) => {
+        if (candidateStakeAmount <= 0n) {
+          return {
+            stakeAmount: 0n,
+            pondToBuy: 0n,
+            wflrForPond: 0n,
+            totalWflrNeeded: 0n
+          };
+        }
 
-      // Calculate WFLR needed for POND purchase (add 2% buffer for rounding)
-      let wflrForPond = 0n;
-      if (pondToBuy > 0n) {
-        const [cost] = await pond.getCostForPond(pondToBuy);
-        wflrForPond = cost + (cost / 50n); // +2% buffer
+        const targetPondForStake = hasActivePosition
+          ? await toadzStake.getPondRequired(currentWflrStaked + candidateStakeAmount)
+          : await toadzStake.getPondRequired(candidateStakeAmount);
+        const additionalPondNeeded = hasActivePosition
+          ? (targetPondForStake > currentPondStaked ? targetPondForStake - currentPondStaked : 0n)
+          : targetPondForStake;
+        const pondToBuy = additionalPondNeeded > unstakedPond ? additionalPondNeeded - unstakedPond : 0n;
+
+        let wflrForPond = 0n;
+        if (pondToBuy > 0n) {
+          const [cost] = await pond.getCostForPond(pondToBuy);
+          wflrForPond = cost + (cost / 50n); // +2% buffer
+        }
+
+        return {
+          stakeAmount: candidateStakeAmount,
+          pondToBuy,
+          wflrForPond,
+          totalWflrNeeded: candidateStakeAmount + wflrForPond
+        };
+      };
+
+      // Input is total budget. Find max stake amount that still leaves room for POND buy.
+      let low = 0n;
+      let high = inputBudget;
+      let bestPlan = await evaluateStakePlan(0n);
+
+      for (let i = 0; i < 28 && low <= high; i++) {
+        const mid = (low + high) / 2n;
+        const plan = await evaluateStakePlan(mid);
+        if (plan.totalWflrNeeded <= inputBudget) {
+          bestPlan = plan;
+          low = mid + 1n;
+        } else {
+          if (mid === 0n) break;
+          high = mid - 1n;
+        }
       }
 
-      // Total WFLR needed = stake amount + WFLR to buy POND
-      const totalWflrNeeded = stakeAmount + wflrForPond;
+      const stakeAmount = bestPlan.stakeAmount;
+      const pondToBuy = bestPlan.pondToBuy;
+      const wflrForPond = bestPlan.wflrForPond;
+      const totalWflrNeeded = bestPlan.totalWflrNeeded;
+
+      if (stakeAmount < minStakeAmount) {
+        throw new Error(
+          `Amount too low after POND allocation. Minimum staked FLR is ${formatDisplayAmount(Number(ethers.formatEther(minStakeAmount)), 4)}.`
+        );
+      }
+
       const existingWflr = await wflr.balanceOf(address);
       const needToWrap = totalWflrNeeded > existingWflr ? totalWflrNeeded - existingWflr : 0n;
       const nativeBalance = await web3Provider.getBalance(address);
@@ -5280,7 +5328,7 @@ useEffect(() => {
     // Auto-split: POND required = FLR^0.7 (from contract getPondRequired)
     // User enters total FLR. We stake stakeAmount WFLR and need stakeAmount^0.7 POND.
     // Some FLR is used to buy POND, rest is staked as WFLR.
-    const calcSplit = (flrAmount) => {
+    const calcSplit = (flrAmount, existingPond = 0) => {
       if (flrAmount <= 0) return { flrForPond: 0, pondReceived: 0, stakeFlr: 0, stakePond: 0 };
       const pondPrice = poolStats.pondPrice || 0.5; // from contract getCurrentPrice
       // Binary search: find max stakeAmount where stakeAmount + cost(stakeAmount^0.7 POND) <= flrAmount
@@ -5288,7 +5336,8 @@ useEffect(() => {
       for (let i = 0; i < 30; i++) {
         const mid = (lo + hi) / 2;
         const pondNeeded = Math.pow(mid, 0.7);
-        const costForPond = pondNeeded * pondPrice;
+        const pondToBuy = Math.max(0, pondNeeded - existingPond);
+        const costForPond = pondToBuy * pondPrice;
         if (mid + costForPond <= flrAmount) {
           lo = mid;
         } else {
@@ -5297,16 +5346,19 @@ useEffect(() => {
       }
       const stakeFlr = Math.floor(lo);
       const pondNeeded = Math.pow(stakeFlr, 0.7);
-      const flrForPond = Math.ceil(pondNeeded * pondPrice);
+      const pondToBuy = Math.max(0, pondNeeded - existingPond);
+      const flrForPond = Math.ceil(pondToBuy * pondPrice);
       return {
         flrForPond,
         pondReceived: Math.floor(pondNeeded),
         stakeFlr,
-        stakePond: Math.floor(pondNeeded)
+        stakePond: Math.floor(pondNeeded),
+        pondToBuy: Math.floor(pondToBuy)
       };
     };
     
-    const split = calcSplit(Number(addAmount) || 0);
+    const split = calcSplit(Number(addAmount) || 0, Math.max(0, user.pondBalance - user.pondStaked));
+    const depositSplit = calcSplit(Number(depositFlr) || 0, user.pondBalance);
     
     return (
       <div style={{ padding: isDesktop ? '40px 0' : '24px 0', maxWidth: 480, margin: '0 auto' }}>
@@ -5945,10 +5997,10 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* POND required (FLR^0.7) */}
+          {/* POND required from budget split */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>POND Required</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>POND Required (est.)</span>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
                 Balance: <span style={{ color: '#fff' }}>{user.pondBalance.toLocaleString()}</span>
               </span>
@@ -5962,34 +6014,22 @@ useEffect(() => {
               fontWeight: 700,
               color: 'rgba(255,255,255,0.5)'
             }}>
-             {depositFlr ? Math.floor(Math.pow(Number(depositFlr), 0.7)).toLocaleString() : '0'}
+             {depositFlr ? depositSplit.stakePond.toLocaleString() : '0'}
             </div>
-            {depositFlr && Math.floor(Math.pow(Number(depositFlr), 0.7)) > user.pondBalance && (
+            {depositFlr && depositSplit.pondToBuy > 0 && (
               <div style={{ fontSize: 10, color: '#ffaa00', marginTop: 5 }}>
-                Need {Math.floor(Math.pow(Number(depositFlr), 0.7) - user.pondBalance).toLocaleString()} more POND — will auto-buy from deposit
+                Need {depositSplit.pondToBuy.toLocaleString()} more POND — will auto-buy from this amount
               </div>
             )}
             {depositFlr && Number(depositFlr) > 0 && (
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>
-                Est total C2FLR needed: {(() => {
-                  const stakeFlr = Number(depositFlr);
-                  const pondNeeded = Math.pow(stakeFlr, 0.7);
-                  const pondShort = Math.max(0, pondNeeded - user.pondBalance);
-                  const pondCost = pondShort * (poolStats.pondPrice || 0.5);
-                  return (stakeFlr + pondCost).toLocaleString(undefined, { maximumFractionDigits: 3 });
-                })()} (stake + POND buy)
+                Est stake from this amount: {depositSplit.stakeFlr.toLocaleString(undefined, { maximumFractionDigits: 3 })} FLR
+                {depositSplit.flrForPond > 0 ? ` + ${depositSplit.flrForPond.toLocaleString()} C2FLR to buy POND` : ''}
               </div>
             )}
-            {depositFlr && Number(depositFlr) > 0 && (() => {
-              const stakeFlr = Number(depositFlr);
-              const pondNeeded = Math.pow(stakeFlr, 0.7);
-              const pondShort = Math.max(0, pondNeeded - user.pondBalance);
-              const pondCost = pondShort * (poolStats.pondPrice || 0.5);
-              const estTotal = stakeFlr + pondCost;
-              return estTotal > user.flrBalance;
-            })() && (
+            {depositFlr && Number(depositFlr) > user.flrBalance && (
               <div style={{ fontSize: 10, color: '#ff6b6b', marginTop: 5 }}>
-                Balance too low for this stake amount (needs more than {user.flrBalance.toLocaleString(undefined, { maximumFractionDigits: 3 })} C2FLR).
+                Balance too low (available {user.flrBalance.toLocaleString(undefined, { maximumFractionDigits: 3 })} C2FLR).
               </div>
             )}
           </div>
@@ -6050,7 +6090,7 @@ useEffect(() => {
 
           {depositFlr && Number(depositFlr) > 0 && Number(depositFlr) < 100 && (
             <div style={{ color: '#ff6b6b', fontSize: 13, marginBottom: 8, textAlign: 'center' }}>
-              Minimum deposit is 100 FLR
+              Minimum deposit is 100 C2FLR
             </div>
           )}
           
@@ -6076,7 +6116,7 @@ useEffect(() => {
             fontWeight: 700,
             cursor: depositFlr && Number(depositFlr) >= 100 && !loading ? 'pointer' : 'default'
           }}>
-            {loading ? 'Processing...' : !depositFlr ? 'Enter amount' : Number(depositFlr) < 100 ? 'Minimum 100 FLR' : `Stake ${Number(depositFlr).toLocaleString()} FLR`}
+            {loading ? 'Processing...' : !depositFlr ? 'Enter amount' : Number(depositFlr) < 100 ? 'Minimum 100 C2FLR' : `Use ${Number(depositFlr).toLocaleString()} C2FLR`}
           </button>
         </div>
         </>
