@@ -948,6 +948,13 @@ useEffect(() => {
     setUserPosition(null);
   };
 
+  const getLockTierFromMultiplier = (multiplier) => {
+    const value = Number(multiplier);
+    if (value >= 4) return 2;
+    if (value >= 2) return 1;
+    return 0;
+  };
+
   // Contract actions
   const handleDeposit = async (amount, tier) => {
     // Ensure on Coston2 network
@@ -967,11 +974,26 @@ useEffect(() => {
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
 
       const stakeAmount = ethers.parseEther(amount.toString());
+      const position = await toadzStake.positions(address);
+      const hasActivePosition = position[0] > 0n;
+      const currentTier = getLockTierFromMultiplier(position[4]);
+      const selectedTier = Number.isInteger(Number(tier)) ? Number(tier) : currentTier;
+      const lockTierToUse = hasActivePosition ? Math.max(currentTier, selectedTier) : selectedTier;
 
-      // Figure out how much POND is needed for this stake
-      const pondRequired = await toadzStake.getPondRequired(stakeAmount);
-      const existingPond = await pond.balanceOf(address);
-      const pondToBuy = pondRequired > existingPond ? pondRequired - existingPond : 0n;
+      // Calculate incremental POND requirement using unstaked balance only.
+      const totalPondBalance = await pond.balanceOf(address);
+      const currentlyStakedPond = await pond.stakedPond(address);
+      const unstakedPond = totalPondBalance > currentlyStakedPond ? totalPondBalance - currentlyStakedPond : 0n;
+
+      const currentWflrStaked = position[0];
+      const currentPondStaked = position[1];
+      const targetPondForStake = hasActivePosition
+        ? await toadzStake.getPondRequired(currentWflrStaked + stakeAmount)
+        : await toadzStake.getPondRequired(stakeAmount);
+      const additionalPondNeeded = hasActivePosition
+        ? (targetPondForStake > currentPondStaked ? targetPondForStake - currentPondStaked : 0n)
+        : targetPondForStake;
+      const pondToBuy = additionalPondNeeded > unstakedPond ? additionalPondNeeded - unstakedPond : 0n;
 
       // Calculate WFLR needed for POND purchase (add 2% buffer for rounding)
       let wflrForPond = 0n;
@@ -1015,18 +1037,20 @@ useEffect(() => {
         await appTx.wait();
       }
 
-      // 5. Deposit
-      showToast('info', 'Depositing...');
-      const tx = await toadzStake.deposit(stakeAmount, tier, referrerFromUrl || ethers.ZeroAddress, { gasLimit: 3000000 });
+      // 5. Deposit for new users, addToStake for active positions
+      showToast('info', hasActivePosition ? 'Adding to existing stake...' : 'Depositing...');
+      const tx = hasActivePosition
+        ? await toadzStake.addToStake(stakeAmount, lockTierToUse, { gasLimit: 3000000 })
+        : await toadzStake.deposit(stakeAmount, lockTierToUse, referrerFromUrl || ethers.ZeroAddress, { gasLimit: 3000000 });
       await tx.wait();
       
-      showToast('success', 'Deposit successful!');
+      showToast('success', hasActivePosition ? 'Stake updated successfully!' : 'Deposit successful!');
       await loadUserData(walletAddress, contracts);
       setShowCustomDeposit(false);
       setDepositFlr('');
     } catch (err) {
       console.error('Deposit failed:', err);
-      showToast('error', 'Deposit failed: ' + (err.reason || err.message));
+      showToast('error', 'Deposit failed: ' + (err.reason || err.shortMessage || err.message));
     }
     setLoading(false);
   };
@@ -5249,7 +5273,7 @@ useEffect(() => {
               <button 
                 onClick={async () => { 
                   if (Number(addAmount) > 0) {
-                    await handleDeposit(addAmount, user.lockTier || lockTier);
+                    await handleDeposit(addAmount, lockTier);
                     setShowAddModal(false); 
                     setAddAmount(''); 
                   }

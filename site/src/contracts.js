@@ -61,6 +61,7 @@ export const ABIS = {
   
   ToadzStake: [
     'function deposit(uint256 wflrAmount, uint8 lockTier, address _referrer) external',
+    'function addToStake(uint256 wflrAmount, uint8 lockTier) external',
     'function exit() external',
     'function restake(uint8 newLockTier) external',
     'function positions(address user) view returns (uint256 wflrStaked, uint256 pondStaked, uint256 earnedWflr, uint256 lockExpiry, uint256 lockMultiplier, uint256 rewardDebt, uint256 lastUpdateTime)',
