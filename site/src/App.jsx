@@ -763,145 +763,13 @@ setLockExpired(isExpired);
       // Boost sync not needed on Coston2 testnet
       setBoostSyncNeeded(false);
       
-      // Get mint data (mPOND balance)
-      try {
-        const mpondBal = await toadzMint.mpondBalance(address);
-        setMintData({
-          isLive: false, // No active drops yet
-          totalMinted: 0,
-          maxSupply: 0,
-          credits: Number(mpondBal),
-        });
-      } catch (e) {
-        console.log('Mint data not available');
-        setMintData({ isLive: false, totalMinted: 0, maxSupply: 0, credits: 0 });
-      }
+      // Mint not available on Coston2
+      setMintData({ isLive: false, totalMinted: 0, maxSupply: 0, credits: 0 });
       
-      // Get OG NFT data for vault (always from Songbird)
-      const songbirdProvider = new ethers.JsonRpcProvider(COSTON2_CHAIN.rpcUrls[0]);
-      const ogCollectionsData = await Promise.all(
-        OG_COLLECTIONS.map(async (col) => {
-          try {
-            const nftContract = new ethers.Contract(col.address, [
-              'function balanceOf(address) view returns (uint256)',
-              'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'
-            ], songbirdProvider);
-            const owned = await nftContract.balanceOf(address);
-            const ownedCount = Number(owned);
-            
-            // Fetch token IDs via Transfer events
-            let ownedTokenIds = [];
-            if (ownedCount > 0) {
-              try {
-                // Use Songbird Explorer API to get NFT transfers
-                const apiUrl = `https://songbird-explorer.flare.network/api?module=account&action=tokennfttx&address=${address}&contractaddress=${col.address}`;
-                const response = await fetch(apiUrl);
-                const data = await response.json();
-                
-                if (data.status === '1' && data.result && data.result.length > 0) {
-                  // Sort by timestamp (oldest first) to process in order
-                  const sortedTxs = data.result.sort((a, b) => Number(a.timeStamp) - Number(b.timeStamp));
-                  
-                  // Track tokens in and out
-                  const received = new Set();
-                  for (const tx of sortedTxs) {
-                    const tokenId = Number(tx.tokenID);
-                    const isIncoming = tx.to.toLowerCase() === address.toLowerCase();
-                    const isOutgoing = tx.from.toLowerCase() === address.toLowerCase();
-                    
-                    // Self-transfer: skip (already owned)
-                    if (isIncoming && isOutgoing) {
-                      continue;
-                    }
-                    if (isIncoming) {
-                      received.add(tokenId);
-                    }
-                    if (isOutgoing) {
-                      received.delete(tokenId);
-                    }
-                  }
-                  ownedTokenIds = Array.from(received);
-                }
-              } catch (e) {
-                // Explorer API failed, will use manual entry
-              }
-            }
-            
-            // Get locked token IDs from OGVault on Songbird
-            let lockedTokenIds = [];
-            try {
-              const ogVault = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.OGVault, songbirdProvider);
-              const lockedNfts = await ogVault.getLockedNfts(address, col.address);
-              lockedTokenIds = lockedNfts.map(id => Number(id));
-            } catch (e) {
-              // OGVault may not have this user
-            }
-            
-            // Available = owned but not locked
-            const availableTokenIds = ownedTokenIds.filter(id => !lockedTokenIds.includes(id));
-            
-            return {
-              ...col,
-              owned: ownedCount,
-              locked: lockedTokenIds.length,
-              ownedTokenIds,
-              lockedTokenIds,
-              availableTokenIds,
-            };
-          } catch (e) {
-            console.error(`Failed to load ${col.name}:`, e);
-            return { ...col, owned: 0, locked: 0, ownedTokenIds: [], lockedTokenIds: [], availableTokenIds: [] };
-          }
-        })
-      );
-      
-      const totalOwned = ogCollectionsData.reduce((sum, c) => sum + c.owned, 0);
-      const totalLocked = ogCollectionsData.reduce((sum, c) => sum + c.locked, 0);
-      
-      setOgNftData({
-        collections: ogCollectionsData,
-        totalOwned,
-        totalLocked,
-      });
-      
-      // Load Tadz claim data from claimer contract (Flare)
-      try {
-        const flareProvider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
-        const claimer = new ethers.Contract(TADZ_CLAIMER.address, TADZ_CLAIMER.abi, flareProvider);
-        
-        // Get how many user has already claimed
-        const claimedAmount = await claimer.claimed(address);
-        const claimed = Number(claimedAmount);
-        
-        // Allocation is 3 Tadz per OG locked
-        const allocation = totalLocked * 3;
-        const claimable = Math.max(0, allocation - claimed);
-        
-        // For now, we'll generate proof on-demand when claiming
-        // In production, fetch from hosted merkle-tree.json
-        setTadzClaimData({
-          allocation,
-          claimed,
-          claimable,
-          proof: [], // Will be fetched when claiming
-          loading: false
-        });
-      } catch (e) {
-        console.error('Failed to load Tadz claim data:', e);
-      }
-      
-      // Fetch all lockers for social proof
-      try {
-        const ogVault = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.OGVault, songbirdProvider);
-        const [lockers, counts, total] = await ogVault.getAllLockers();
-        const lockersData = lockers.map((addr, i) => ({
-          address: addr,
-          count: Number(counts[i])
-        })).sort((a, b) => b.count - a.count); // Sort by count descending
-        setAllLockers(lockersData);
-      } catch (e) {
-        console.error('Failed to load all lockers:', e);
-      }
+      // OG NFT data / OGVault / TadzClaimer — not available on Coston2 testnet
+      setOgNftData({ collections: [], totalOwned: 0, totalLocked: 0 });
+      setTadzClaimData({ allocation: 0, claimed: 0, claimable: 0, proof: [], loading: false });
+      setAllLockers([]);
       
     } catch (err) {
       console.error('Failed to load user data:', err);
@@ -1272,83 +1140,12 @@ useEffect(() => {
   };
 
   const handleLockOG = async (collection, tokenId) => {
-    // Must be on Songbird - auto-switch if not
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== COSTON2_CHAIN.chainId) {
-      showToast('info', 'Switching to Songbird...');
-      await switchToSongbird();
-      // Wait for network switch to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    setLoading(true);
-    try {
-      const songbirdProvider = new ethers.BrowserProvider(window.ethereum);
-      const songbirdSigner = await songbirdProvider.getSigner();
-      
-      // Approve NFT for OGVault
-      const nftContract = new ethers.Contract(collection, ABIS.ERC721, songbirdSigner);
-      const isApproved = await nftContract.isApprovedForAll(walletAddress, CONTRACTS.BoostRegistry);
-      if (!isApproved) {
-        const approveTx = await nftContract.setApprovalForAll(CONTRACTS.BoostRegistry, true, { gasLimit: 500000 });
-        await approveTx.wait();
-      }
-      
-      // Lock in OGVault
-      const ogVault = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.OGVault, songbirdSigner);
-      const tx = await ogVault.lock(collection, tokenId, { gasLimit: 500000 });
-      await tx.wait();
-      
-      showToast('success', 'NFT locked! Boost now active on Flare');
-      await loadUserData(walletAddress, contracts);
-      setStakeNftModal(null);
-    } catch (err) {
-      console.error('Lock OG failed:', err);
-      showToast('error', 'Lock failed: ' + (err.reason || err.message));
-    }
-    setLoading(false);
+    showToast('error', 'OG Vault not available on Coston2 testnet');
   };
 
-  // Claim Tadz airdrop based on OG locks
+  // Claim Tadz - not available on Coston2
   const handleClaimTadz = async () => {
-    if (tadzClaimData.claimable <= 0) {
-      showToast('error', 'Nothing to claim');
-      return;
-    }
-    
-    // Must be on Flare - auto-switch if not
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== COSTON2_CHAIN.chainId) {
-      showToast('info', 'Switching to Flare...');
-      await switchToFlare();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    setLoading(true);
-    try {
-      // Use imported merkle tree data
-      const userProof = merkleTreeData.proofs[walletAddress.toLowerCase()];
-      if (!userProof) {
-        showToast('error', 'No allocation found. Lock OGs first, then wait for next snapshot.');
-        setLoading(false);
-        return;
-      }
-      
-      const flareProvider = new ethers.BrowserProvider(window.ethereum);
-      const flareSigner = await flareProvider.getSigner();
-      const claimer = new ethers.Contract(TADZ_CLAIMER.address, TADZ_CLAIMER.abi, flareSigner);
-      
-      // Claim with proof
-      const tx = await claimer.claim(userProof.tadzAllocation, userProof.proof, { gasLimit: 500000 });
-      await tx.wait();
-      
-      showToast('success', `Claimed ${tadzClaimData.claimable} Tadz!`);
-      await loadUserData(walletAddress, contracts);
-    } catch (err) {
-      console.error('Claim Tadz failed:', err);
-      showToast('error', 'Claim failed: ' + (err.reason || err.message));
-    }
-    setLoading(false);
+    showToast('error', 'Tadz claim not available on Coston2 testnet');
   };
 
   const handleUnstakeNFT = async (collection, tokenId) => {
