@@ -1,6 +1,6 @@
 // force rebuild 12345
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACTS, COSTON2_CHAIN, ABIS, LOCK_TIERS, OG_COLLECTIONS } from './contracts.js';
 const merkleTreeData = { proofs: {}, root: '0x' + '0'.repeat(64) }; // Placeholder for testnet
@@ -173,6 +173,7 @@ const ToadzFinal = () => {
   }, [userName]);
 
   const isDesktop = windowWidth >= 768;
+  const inflowCacheKey = `toadz_inflow_history_v3_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}`;
 
   // Contract state
   const [provider, setProvider] = useState(null);
@@ -202,7 +203,10 @@ const ToadzFinal = () => {
   const [loading, setLoading] = useState(false);
   const [inflowHistory, setInflowHistory] = useState([]);
   const [loadingInflowHistory, setLoadingInflowHistory] = useState(false);
+  const [inflowSyncing, setInflowSyncing] = useState(false);
   const [showInflowHistory, setShowInflowHistory] = useState(false);
+  const inflowHistoryRef = useRef([]);
+  const inflowSyncInFlightRef = useRef(false);
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
 
@@ -794,8 +798,14 @@ setLockExpired(isExpired);
 
   const loadInflowHistory = async () => {
     if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') return;
+    if (inflowSyncInFlightRef.current) return;
 
-    setLoadingInflowHistory(true);
+    inflowSyncInFlightRef.current = true;
+    const existingHistory = inflowHistoryRef.current;
+    const hasExisting = existingHistory.length > 0;
+    if (!hasExisting) setLoadingInflowHistory(true);
+    else setInflowSyncing(true);
+
     try {
       const readProvider = provider || new ethers.BrowserProvider(window.ethereum);
       const latestBlock = await readProvider.getBlockNumber();
@@ -810,17 +820,9 @@ setLockExpired(isExpired);
       const TOPIC_PGS = ethers.id('PGSReceived(uint256)');
       const TOPIC_FTSO = ethers.id('FTSORewardsClaimed(uint24,uint256)');
       const TOPIC_BURN = ethers.id('WithdrawnToStake(address,uint256)');
+      const timestampCache = new Map();
 
-      // Coston2 RPC currently enforces small eth_getLogs ranges, so scan in tiny chunks backwards.
-      const chunkSize = 30;
-      const maxChunks = 300; // 9,000 blocks max search depth.
-      const targetEntries = 16;
-      const entries = [];
-
-      let toBlock = latestBlock;
-      for (let i = 0; i < maxChunks && entries.length < targetEntries && toBlock >= 0; i++) {
-        const fromBlock = Math.max(0, toBlock - chunkSize + 1);
-
+      const fetchChunkEntries = async (fromBlock, toBlock) => {
         const [stakeLogs, burnLogs] = await Promise.all([
           readProvider.getLogs({
             address: CONTRACTS.ToadzStake,
@@ -836,10 +838,12 @@ setLockExpired(isExpired);
           }).catch(() => [])
         ]);
 
+        const parsedEntries = [];
+
         for (const log of stakeLogs) {
           const parsed = stakeInterface.parseLog(log);
           if (log.topics[0] === TOPIC_PGS) {
-            entries.push({
+            parsedEntries.push({
               category: 'PGS',
               amountFlr: Number(ethers.formatEther(parsed.args.amount)),
               label: 'POND floor payout',
@@ -848,7 +852,7 @@ setLockExpired(isExpired);
               logIndex: log.index
             });
           } else if (log.topics[0] === TOPIC_FTSO) {
-            entries.push({
+            parsedEntries.push({
               category: 'FTSO',
               amountFlr: Number(ethers.formatEther(parsed.args.amount)),
               label: `Epoch ${parsed.args.epochId.toString()}`,
@@ -861,7 +865,7 @@ setLockExpired(isExpired);
 
         for (const log of burnLogs) {
           const parsed = bufferInterface.parseLog(log);
-          entries.push({
+          parsedEntries.push({
             category: 'POND burn',
             amountFlr: Number(ethers.formatEther(parsed.args.amount)),
             label: 'Restake buyback',
@@ -871,31 +875,76 @@ setLockExpired(isExpired);
           });
         }
 
-        if (fromBlock === 0) break;
-        toBlock = fromBlock - 1;
+        const blocksToFetch = [...new Set(parsedEntries.map((item) => item.blockNumber))]
+          .filter((blockNumber) => !timestampCache.has(blockNumber));
+        await Promise.all(blocksToFetch.map(async (blockNumber) => {
+          const block = await readProvider.getBlock(blockNumber);
+          timestampCache.set(blockNumber, block?.timestamp || 0);
+        }));
+
+        return parsedEntries.map((item) => ({
+          ...item,
+          timestamp: timestampCache.get(item.blockNumber) || 0,
+          id: `${item.txHash}-${item.logIndex}`
+        }));
+      };
+
+      let nextHistory = [...existingHistory];
+      const chunkSize = 30;
+
+      if (hasExisting) {
+        // Incremental sync: only scan blocks after the newest known event.
+        const newestKnownBlock = existingHistory.reduce(
+          (max, item) => Math.max(max, item.blockNumber || 0),
+          0
+        );
+        if (newestKnownBlock < latestBlock) {
+          const incrementalEntries = [];
+          for (let fromBlock = newestKnownBlock + 1; fromBlock <= latestBlock; fromBlock += chunkSize) {
+            const toBlock = Math.min(latestBlock, fromBlock + chunkSize - 1);
+            const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
+            incrementalEntries.push(...chunkEntries);
+          }
+
+          if (incrementalEntries.length > 0) {
+            const unique = new Map();
+            [...existingHistory, ...incrementalEntries].forEach((item) => unique.set(item.id, item));
+            nextHistory = [...unique.values()]
+              .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
+              .slice(0, 12);
+          }
+        }
+      } else {
+        // Initial sync: short backward scan for quick first paint.
+        const maxChunks = 40; // 1,200 blocks max.
+        const targetEntries = 8;
+        const collectedEntries = [];
+        let toBlock = latestBlock;
+
+        for (let i = 0; i < maxChunks && collectedEntries.length < targetEntries && toBlock >= 0; i++) {
+          const fromBlock = Math.max(0, toBlock - chunkSize + 1);
+          const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
+          collectedEntries.push(...chunkEntries);
+          if (fromBlock === 0) break;
+          toBlock = fromBlock - 1;
+        }
+
+        nextHistory = collectedEntries
+          .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
+          .slice(0, 12);
       }
 
-      const uniqueBlocks = [...new Set(entries.map((item) => item.blockNumber))];
-      const blockTimestampMap = new Map();
-      await Promise.all(uniqueBlocks.map(async (blockNumber) => {
-        const block = await readProvider.getBlock(blockNumber);
-        blockTimestampMap.set(blockNumber, block?.timestamp || 0);
-      }));
-
-      const history = entries
-        .map((item) => ({
-          ...item,
-          timestamp: blockTimestampMap.get(item.blockNumber) || 0,
-          id: `${item.txHash}-${item.logIndex}`
-        }))
-        .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
-        .slice(0, 12);
-
-      setInflowHistory(history);
+      inflowHistoryRef.current = nextHistory;
+      setInflowHistory(nextHistory);
+      if (typeof window !== 'undefined' && nextHistory.length > 0) {
+        localStorage.setItem(inflowCacheKey, JSON.stringify(nextHistory));
+      }
     } catch (err) {
       console.log('Failed to load inflow history:', err);
     } finally {
       setLoadingInflowHistory(false);
+      setInflowSyncing(false);
+      inflowSyncInFlightRef.current = false;
     }
   };
 
@@ -910,10 +959,32 @@ setLockExpired(isExpired);
   }, [connected, walletAddress, contracts]);
 
   useEffect(() => {
+    inflowHistoryRef.current = inflowHistory;
+  }, [inflowHistory]);
+
+  useEffect(() => {
     if (!connected || !walletAddress) {
       setInflowHistory([]);
+      inflowHistoryRef.current = [];
       setShowInflowHistory(false);
+      setLoadingInflowHistory(false);
+      setInflowSyncing(false);
       return;
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(inflowCacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            inflowHistoryRef.current = parsed;
+            setInflowHistory(parsed);
+          }
+        }
+      } catch (err) {
+        console.log('Failed to parse inflow cache:', err);
+      }
     }
 
     loadInflowHistory();
@@ -922,7 +993,7 @@ setLockExpired(isExpired);
     }, 120000);
 
     return () => clearInterval(interval);
-  }, [connected, walletAddress, provider]);
+  }, [connected, walletAddress, provider, inflowCacheKey]);
 
   // Auto-reconnect wallet on page load
   useEffect(() => {
@@ -5702,7 +5773,9 @@ useEffect(() => {
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Recent FLR Inflows</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                {loadingInflowHistory ? 'Syncing...' : inflowHistory.length > 0 ? `${inflowHistory.length} recent event${inflowHistory.length > 1 ? 's' : ''}` : 'No recent inflows'}
+                {inflowHistory.length > 0
+                  ? `${inflowHistory.length} recent event${inflowHistory.length > 1 ? 's' : ''}${inflowSyncing ? ' • syncing' : ''}`
+                  : (loadingInflowHistory || inflowSyncing ? 'Syncing...' : 'No recent inflows')}
               </div>
             </div>
             <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>{showInflowHistory ? '▾' : '▸'}</div>
@@ -5710,48 +5783,55 @@ useEffect(() => {
 
           {showInflowHistory && (
             <div style={{ marginTop: 12 }}>
-              {loadingInflowHistory ? (
+              {loadingInflowHistory && inflowHistory.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
               ) : inflowHistory.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {inflowHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        background: 'rgba(0,0,0,0.25)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: 10,
-                        padding: '10px 12px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
-                            background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
-                            border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
-                            borderRadius: 999,
-                            padding: '2px 7px'
-                          }}
-                        >
-                          {item.category}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
-                      </div>
+                <>
+                  {inflowSyncing && (
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+                      Syncing latest events...
                     </div>
-                  ))}
-                </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {inflowHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          background: 'rgba(0,0,0,0.25)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: 10,
+                          padding: '10px 12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
+                              background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
+                              border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
+                              borderRadius: 999,
+                              padding: '2px 7px'
+                            }}
+                          >
+                            {item.category}
+                          </span>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
