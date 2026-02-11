@@ -382,7 +382,7 @@ const ToadzFinal = () => {
     const nfts = [];
     
     // Use read-only provider - doesn't depend on wallet provider state
-    const readProvider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
+    const readProvider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
     
     for (const col of BOOST_COLLECTIONS) {
       try {
@@ -432,8 +432,8 @@ const ToadzFinal = () => {
       const nfts = [];
       
       try {
-        if (!isFlare) {
-          // Songbird - use indexer
+        if (false) {
+          // Disabled on Coston2 - no indexer
           const res = await fetch(`https://toadz-indexer-production.up.railway.app/live-nfts/${walletAddress}`);
           const data = await res.json();
           
@@ -478,7 +478,7 @@ const ToadzFinal = () => {
             '0xbc42e9a6c24664749b2a0d571fd67f23386e34b8': (id) => `https://sparklesnft.imgix.net/ipfs/QmRCttzFebHEkmLzadbhkm2Wgy2Rh1FibrxXxRD93tr7Gp/${id}.png`,
           };
           
-          const provider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
+          const provider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
           
           const nftContract = new ethers.Contract(listModalCollection.address, [
             'function balanceOf(address) view returns (uint256)',
@@ -574,23 +574,8 @@ const ToadzFinal = () => {
         buffer.totalFtsoRewardsClaimed().catch(() => 0n),
       ]);
       
-      // Calculate top staker return - fetch stakers from indexer
+      // Top staker return - skip indexer on testnet
       let topReturn = 0;
-      try {
-        const stakersRes = await fetch('https://toadz-indexer-production.up.railway.app/api/stakers');
-        const stakers = await stakersRes.json();
-        
-        // Check each staker's return (limit to 100 for performance)
-        for (const staker of stakers.slice(0, 100)) {
-          try {
-            const percentGain = await toadzStake.getPercentGain(staker);
-            const pct = Number(percentGain) / 100;
-            if (pct > topReturn) topReturn = pct;
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.log('Could not fetch stakers from indexer:', e);
-      }
       
       setPoolStats({
         totalWflr: Number(ethers.formatEther(totalWflr)),
@@ -610,30 +595,10 @@ const ToadzFinal = () => {
     loadPublicStats();
   }, []);
 
- // Load marketplace listings from contract
+ // Load marketplace listings - disabled on Coston2 (no getAllActiveListings)
 React.useEffect(() => {
-  const loadListings = async () => {
-    try {
-      const provider = new ethers.JsonRpcProvider('https://songbird-api.flare.network/ext/C/rpc');
-      const market = new ethers.Contract(CONTRACTS.ToadzMarket, [
-        'function getAllActiveListings() view returns (address[] collections, uint256[] tokenIds, address[] sellers, uint256[] prices)'
-      ], provider);
-      
-      const [collections, tokenIds, sellers, prices] = await market.getAllActiveListings();
-      
-      const listings = collections.map((col, i) => ({
-        collection: col,
-        tokenId: tokenIds[i].toString(),
-        seller: sellers[i],
-        price: ethers.formatEther(prices[i])
-      }));
-      
-      setMarketListings(listings);
-    } catch (err) {
-      console.error('Failed to load listings:', err);
-    }
-  };
-  loadListings();
+  // ToadzMarket on Coston2 doesn't have getAllActiveListings
+  setMarketListings([]);
 }, []);
   
   // Sync OG count from Songbird to Flare (calls backend)
@@ -642,7 +607,7 @@ const syncToFlare = async () => {
   setSyncPending(true);
   try {
     // Read from Songbird
-    const songbirdProvider = new ethers.JsonRpcProvider('https://songbird-api.flare.network/ext/C/rpc');
+    const songbirdProvider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
     
     const ogVaultSongbird = new ethers.Contract(
       CONTRACTS.BoostRegistry,
@@ -724,10 +689,10 @@ const syncToFlare = async () => {
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
       const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
       const boostRegistry = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.BoostRegistry, web3Signer);
-      const toadzMint = new ethers.Contract(CONTRACTS.ToadzMint, ABIS.ToadzMint, web3Signer);
-      
+      const toadzMint = CONTRACTS.ToadzMint ? new ethers.Contract(CONTRACTS.ToadzMint, ABIS.ToadzMint, web3Signer) : null;
+
       setContracts({ toadzStake, pond, wflr, boostRegistry, toadzMint });
-      
+
       // Load user data
       await loadUserData(address, { toadzStake, pond, wflr, boostRegistry, toadzMint });
       
@@ -776,25 +741,8 @@ setLockExpired(isExpired);
       const buffer = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, toadzStake.runner);
       const bufferFtso = await buffer.totalFtsoRewardsClaimed().catch(() => 0n);
       
-      // Calculate top staker return - fetch from indexer
+      // Top staker return - skip indexer on testnet
       let topReturn = 0;
-      try {
-        const stakersRes = await fetch('https://toadz-indexer-production.up.railway.app/api/stakers');
-        const stakers = await stakersRes.json();
-        
-        // Add connected user if not in list
-        const allStakers = [...new Set([...stakers, address].filter(Boolean))];
-        
-        for (const staker of allStakers.slice(0, 100)) {
-          try {
-            const percentGain = await toadzStake.getPercentGain(staker);
-            const pct = Number(percentGain) / 100;
-            if (pct > topReturn) topReturn = pct;
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.log('Could not fetch stakers:', e);
-      }
       
       setPoolStats({
         totalWflr: Number(ethers.formatEther(totalWflr)),
@@ -812,31 +760,8 @@ setLockExpired(isExpired);
         stakedNfts: [],
       });
       
-      // Check if boost sync needed (Songbird vs Flare)
-      try {
-        const songbirdProvider = new ethers.JsonRpcProvider('https://songbird-api.flare.network/ext/C/rpc');
-        const songbirdOGVault = new ethers.Contract(CONTRACTS.BoostRegistry, ['function lockedCount(address) view returns (uint256)'], songbirdProvider);
-        const songbirdMarket = new ethers.Contract(CONTRACTS.ToadzMarket, ['function getUserListingCount(address) view returns (uint256)'], songbirdProvider);
-        
-        const [songbirdOG, songbirdListings] = await Promise.all([
-          songbirdOGVault.lockedCount(address),
-          songbirdMarket.getUserListingCount(address)
-        ]);
-        
-        const breakdown = await boostRegistry.getBoostBreakdown(address);
-        const flareOG = Number(breakdown[0]);
-        const flareListings = Number(breakdown[1]);
-        
-        const needsSync = Number(songbirdOG) > flareOG || Number(songbirdListings) > flareListings;
-        setBoostSyncNeeded(needsSync);
-        
-        // Auto-sync if needed
-        if (needsSync) {
-          syncToFlare();
-        }
-      } catch (e) {
-        console.log('Boost sync check failed:', e);
-      }
+      // Boost sync not needed on Coston2 testnet
+      setBoostSyncNeeded(false);
       
       // Get mint data (mPOND balance)
       try {
@@ -941,7 +866,7 @@ setLockExpired(isExpired);
       
       // Load Tadz claim data from claimer contract (Flare)
       try {
-        const flareProvider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
+        const flareProvider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
         const claimer = new ethers.Contract(TADZ_CLAIMER.address, TADZ_CLAIMER.abi, flareProvider);
         
         // Get how many user has already claimed
@@ -1013,15 +938,10 @@ setLockExpired(isExpired);
 useEffect(() => {
     const loadMarketListings = async () => {
       try {
-        const provider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
-        const market = new ethers.Contract('0xa36a221F9BAc3691BfD69A23AB67d2f6F7F40A7d', [
-          'function getAllActiveListings() view returns (address[] collections, uint256[] tokenIds, address[] sellers, uint256[] prices, uint256[] commitmentDays, uint256[] listedAts)',
-          'function getAllActiveRentalListings() view returns (address[] collections, uint256[] tokenIds, address[] owners, uint256[] dailyRates, uint256[] commitmentEnds)',
-          'function getActiveRental(address,uint256) view returns (address renter, uint256 startTime, uint256 endTime, uint256 dailyRate, uint256 pendingPayment)'
-        ], provider);
-        
-        // Fetch sale listings (V5: no dailyRate for sales)
-        const [collections, tokenIds, sellers, prices, commitmentDays, listedAts] = await market.getAllActiveListings();
+        // Coston2 ToadzMarket doesn't have getAllActiveListings - skip
+        setFlareListings([]);
+        return;
+        const [collections, tokenIds, sellers, prices, commitmentDays, listedAts] = [[], [], [], [], [], []];
         const saleListings = collections.map((c, i) => ({
           collection: c,
           tokenId: tokenIds[i].toString(),
@@ -1149,44 +1069,73 @@ useEffect(() => {
 
   // Contract actions
   const handleDeposit = async (amount, tier) => {
-    // Ensure on Flare network
+    // Ensure on Coston2 network
     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
     if (chainId !== COSTON2_CHAIN.chainId) {
       await switchToFlare();
     }
-    
+
     setLoading(true);
     try {
       const web3Provider = new ethers.BrowserProvider(window.ethereum);
       const web3Signer = await web3Provider.getSigner();
-      const zap = new ethers.Contract(CONTRACTS.Zap, ABIS.Zap, web3Signer);
-      
-      // Binary search to find stake amount that fits within user's FLR
+      const address = await web3Signer.getAddress();
+
+      const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
+      const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
+      const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
+
       const totalFlr = ethers.parseEther(amount.toString());
-      let low = totalFlr / 2n;
-      let high = totalFlr;
-      let stakeAmount = low;
-      
-      for (let i = 0; i < 20; i++) {
-        const mid = (low + high) / 2n;
-        const [needed] = await zap.previewDeposit(mid, walletAddress);
-        if (needed <= totalFlr) {
-          stakeAmount = mid;
-          low = mid;
-        } else {
-          high = mid;
+
+      // 1. Wrap C2FLR → WFLR
+      showToast('info', 'Wrapping C2FLR...');
+      const wrapTx = await wflr.deposit({ value: totalFlr });
+      await wrapTx.wait();
+
+      // 2. Figure out how much POND is needed
+      const pondRequired = await toadzStake.getPondRequired(totalFlr);
+
+      if (pondRequired > 0n) {
+        // Check existing POND balance
+        const pondBal = await pond.balanceOf(address);
+        if (pondBal < pondRequired) {
+          // Buy POND with some WFLR
+          const pondToBuy = pondRequired - pondBal;
+          const [pondCost] = await pond.getCostForPond(pondToBuy);
+
+          // Approve WFLR for POND purchase
+          const allowancePond = await wflr.allowance(address, CONTRACTS.POND);
+          if (allowancePond < pondCost) {
+            showToast('info', 'Approving WFLR for POND...');
+            const appTx = await wflr.approve(CONTRACTS.POND, ethers.MaxUint256);
+            await appTx.wait();
+          }
+
+          showToast('info', 'Buying POND...');
+          const buyTx = await pond.buy(pondCost);
+          await buyTx.wait();
         }
-        if (high - low < ethers.parseEther("0.1")) break;
+
+        // Approve POND for staking
+        const pondAllowance = await pond.allowance(address, CONTRACTS.ToadzStake);
+        if (pondAllowance < pondRequired) {
+          showToast('info', 'Approving POND...');
+          const appTx = await pond.approve(CONTRACTS.ToadzStake, ethers.MaxUint256);
+          await appTx.wait();
+        }
       }
-      
-      // Get exact FLR needed for this stake amount
-      const [flrNeeded] = await zap.previewDeposit(stakeAmount, walletAddress);
-      
-      // ONE transaction - Zap handles wrap, POND buy, and deposit
-      const tx = await zap.zapDeposit(stakeAmount, tier, referrerFromUrl || ethers.ZeroAddress, { 
-        value: flrNeeded,
-        gasLimit: 3000000 
-      });
+
+      // 3. Approve WFLR for staking
+      const wflrAllowance = await wflr.allowance(address, CONTRACTS.ToadzStake);
+      if (wflrAllowance < totalFlr) {
+        showToast('info', 'Approving WFLR...');
+        const appTx = await wflr.approve(CONTRACTS.ToadzStake, ethers.MaxUint256);
+        await appTx.wait();
+      }
+
+      // 4. Deposit
+      showToast('info', 'Depositing...');
+      const tx = await toadzStake.deposit(totalFlr, tier, referrerFromUrl || ethers.ZeroAddress, { gasLimit: 3000000 });
       await tx.wait();
       
       showToast('success', 'Deposit successful!');
@@ -1436,13 +1385,13 @@ useEffect(() => {
     setLoading(true);
     try {
       if (isRentOnly) {
-        const market = new ethers.Contract('0xa36a221F9BAc3691BfD69A23AB67d2f6F7F40A7d', [
+        const market = new ethers.Contract('0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F', [
           'function cancelRentalListing(address,uint256)'
         ], signer);
         const tx = await market.cancelRentalListing(collection, tokenId);
         await tx.wait();
       } else {
-        const market = new ethers.Contract('0xa36a221F9BAc3691BfD69A23AB67d2f6F7F40A7d', [
+        const market = new ethers.Contract('0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F', [
           'function cancel(address,uint256)'
         ], signer);
         const tx = await market.cancel(collection, tokenId);
@@ -1460,7 +1409,7 @@ useEffect(() => {
     if (!signer) return;
     setLoading(true);
     try {
-      const market = new ethers.Contract('0xa36a221F9BAc3691BfD69A23AB67d2f6F7F40A7d', [
+      const market = new ethers.Contract('0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F', [
         'function buy(address,uint256) payable'
       ], signer);
       const tx = await market.buy(collection, tokenId, { value: ethers.parseEther(price) });
@@ -6250,7 +6199,7 @@ useEffect(() => {
     setAdminData(prev => ({ ...prev, loading: true }));
     
     try {
-      const provider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
+      const provider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
       const stakeContract = new ethers.Contract(CONTRACTS.ToadzStake, [
         'function totalWflrStaked() view returns (uint256)',
         'function totalPondStaked() view returns (uint256)',
@@ -6477,7 +6426,7 @@ useEffect(() => {
       return;
     }
     try {
-      const provider = new ethers.JsonRpcProvider('https://flare-api.flare.network/ext/C/rpc');
+      const provider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
       const stakeContract = new ethers.Contract(CONTRACTS.ToadzStake, [
         'function positions(address) view returns (uint256 wflrStaked, uint256 pondStaked, uint256 earnedWflr, uint256 lockExpiry, uint256 lockMultiplier, uint256 rewardDebt, uint256 lastUpdateTime)'
       ], provider);
