@@ -19,7 +19,7 @@ const TADZ_CLAIMER = {
 
 // Boost-eligible collections (Flare only for now)
 const BOOST_COLLECTIONS = [
-  { name: 'Tadz', address: '0xbaa8344f4a383796695C1F9f3aFE1eaFfdCfeaE6' },
+  // No NFT collections on Coston2 testnet
 ];
 
 // Platform wallets get 10 free listings
@@ -749,7 +749,10 @@ setLockExpired(isExpired);
       // Top staker return - skip indexer on testnet
       let topReturn = 0;
       
+      const pondContract = new ethers.Contract(CONTRACTS.POND, ABIS.POND, toadzStake.runner);
+      const pondPrice = await pondContract.getCurrentPrice().catch(() => ethers.parseEther("0.5"));
       setPoolStats({
+        pondPrice: Number(ethers.formatEther(pondPrice)),
         totalWflr: Number(ethers.formatEther(totalWflr)),
         totalPond: Number(ethers.formatEther(totalPond)),
         cap: Number(ethers.formatEther(cap)),
@@ -758,12 +761,17 @@ setLockExpired(isExpired);
         topStakerReturn: topReturn,
       });
       
-      // Get boost
-      const boost = await boostRegistry.getUserBoost(address);
-      setBoostData({
-        boost: Number(boost) / 1e18, // scaled by PRECISION (1e18)
-        stakedNfts: [],
-      });
+      // Get boost (may fail on Coston2 if ogVaultOracle is not a contract)
+      try {
+        const boost = await boostRegistry.getUserBoost(address);
+        setBoostData({
+          boost: Number(boost) / 1e18,
+          stakedNfts: [],
+        });
+      } catch (e) {
+        console.log('Boost not available on testnet');
+        setBoostData({ boost: 0, stakedNfts: [] });
+      }
       
       // Boost sync not needed on Coston2 testnet
       setBoostSyncNeeded(false);
@@ -965,11 +973,11 @@ useEffect(() => {
       const existingPond = await pond.balanceOf(address);
       const pondToBuy = pondRequired > existingPond ? pondRequired - existingPond : 0n;
 
-      // Calculate WFLR needed for POND purchase
+      // Calculate WFLR needed for POND purchase (add 2% buffer for rounding)
       let wflrForPond = 0n;
       if (pondToBuy > 0n) {
         const [cost] = await pond.getCostForPond(pondToBuy);
-        wflrForPond = cost;
+        wflrForPond = cost + (cost / 50n); // +2% buffer
       }
 
       // Total WFLR needed = stake amount + WFLR to buy POND
