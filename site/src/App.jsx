@@ -1005,15 +1005,7 @@ useEffect(() => {
         await buyTx.wait();
       }
 
-      // 3. Approve POND for staking
-      if (pondRequired > 0n) {
-        const pondAllowance = await pond.allowance(address, CONTRACTS.ToadzStake);
-        if (pondAllowance < pondRequired) {
-          showToast('info', 'Approving POND...');
-          const appTx = await pond.approve(CONTRACTS.ToadzStake, ethers.MaxUint256);
-          await appTx.wait();
-        }
-      }
+      // 3. POND approval NOT needed — ToadzStake calls pond.stake() directly
 
       // 4. Approve WFLR for staking
       const wflrAllowance = await wflr.allowance(address, CONTRACTS.ToadzStake);
