@@ -1142,6 +1142,15 @@ useEffect(() => {
       const totalWflrNeeded = stakeAmount + wflrForPond;
       const existingWflr = await wflr.balanceOf(address);
       const needToWrap = totalWflrNeeded > existingWflr ? totalWflrNeeded - existingWflr : 0n;
+      const nativeBalance = await web3Provider.getBalance(address);
+
+      if (needToWrap > nativeBalance) {
+        const shortfall = needToWrap - nativeBalance;
+        throw new Error(
+          `Insufficient C2FLR for stake + POND. Need ${formatDisplayAmount(Number(ethers.formatEther(needToWrap)), 4)} C2FLR, ` +
+          `have ${formatDisplayAmount(Number(ethers.formatEther(nativeBalance)), 4)} (short ${formatDisplayAmount(Number(ethers.formatEther(shortfall)), 4)}).`
+        );
+      }
 
       // 1. Wrap only what's needed
       if (needToWrap > 0n) {
@@ -5958,6 +5967,29 @@ useEffect(() => {
             {depositFlr && Math.floor(Math.pow(Number(depositFlr), 0.7)) > user.pondBalance && (
               <div style={{ fontSize: 10, color: '#ffaa00', marginTop: 5 }}>
                 Need {Math.floor(Math.pow(Number(depositFlr), 0.7) - user.pondBalance).toLocaleString()} more POND — will auto-buy from deposit
+              </div>
+            )}
+            {depositFlr && Number(depositFlr) > 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>
+                Est total C2FLR needed: {(() => {
+                  const stakeFlr = Number(depositFlr);
+                  const pondNeeded = Math.pow(stakeFlr, 0.7);
+                  const pondShort = Math.max(0, pondNeeded - user.pondBalance);
+                  const pondCost = pondShort * (poolStats.pondPrice || 0.5);
+                  return (stakeFlr + pondCost).toLocaleString(undefined, { maximumFractionDigits: 3 });
+                })()} (stake + POND buy)
+              </div>
+            )}
+            {depositFlr && Number(depositFlr) > 0 && (() => {
+              const stakeFlr = Number(depositFlr);
+              const pondNeeded = Math.pow(stakeFlr, 0.7);
+              const pondShort = Math.max(0, pondNeeded - user.pondBalance);
+              const pondCost = pondShort * (poolStats.pondPrice || 0.5);
+              const estTotal = stakeFlr + pondCost;
+              return estTotal > user.flrBalance;
+            })() && (
+              <div style={{ fontSize: 10, color: '#ff6b6b', marginTop: 5 }}>
+                Balance too low for this stake amount (needs more than {user.flrBalance.toLocaleString(undefined, { maximumFractionDigits: 3 })} C2FLR).
               </div>
             )}
           </div>
