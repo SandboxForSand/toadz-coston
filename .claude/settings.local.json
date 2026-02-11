@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "WebFetch(domain:dev.flare.network)",
+      "Bash(npx hardhat compile:*)",
+      "Bash(npx hardhat run:*)",
+      "WebFetch(domain:faucet.flare.network)",
+      "WebFetch(domain:coston2-faucet.towolabs.com)",
+      "Bash(curl:*)",
+      "Bash(grep -r \"pragma solidity\" /Users/dantian/toadz-coston/contracts/*.sol)",
+      "Bash(gh auth status:*)",
+      "Bash(git --version:*)",
+      "Bash(brew:*)",
+      "Bash(gh api:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

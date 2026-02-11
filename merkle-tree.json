@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-01-28T22:07:03.335Z",
+  "ogVaultAddress": "0x6E4eE531b636e3c389F37082eBdEeB6cbB98f2dA",
+  "totalLockers": 6,
+  "totalLocks": 7,
+  "totalTadzToDistribute": 21,
+  "merkleRoot": "0x2af291010093288bfe6d7eb5fd3826ea6dab83aed8f72da470bc4a4c66125858",
+  "proofs": {
+    "0x9bdb29529016a15754373b9d5b5116ab728e916e": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": [
+        "0xc2f780400fe3cdbfdf949c866b157b9e5c3ebaafe12cd1d8f7572e511d485b3b",
+        "0x34fee62903f0bbd80cd3bba493d7b77240dcfdea09f2d26a31a88e0744b42cba",
+        "0x5a34476261274bfaef27797a5eb06557fd9b4f020850e6ea12c66f3d3b524b3f"
+      ]
+    },
+    "0x96f6813c9c4b79538bff885b438615eff0848c02": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": [
+        "0x2ba52e30c313b8710738362428cf3c40d40737c6fd93de97562ebb2eb04439d2",
+        "0x34fee62903f0bbd80cd3bba493d7b77240dcfdea09f2d26a31a88e0744b42cba",
+        "0x5a34476261274bfaef27797a5eb06557fd9b4f020850e6ea12c66f3d3b524b3f"
+      ]
+    },
+    "0xcf64ca3a422054deb35c829a3fc79e03955daf4b": {
+      "ogCount": 2,
+      "tadzAllocation": 6,
+      "proof": [
+        "0x1b1d5fb3b6fefaf7ba64a11ee97ac81d7418e2a879bcf9526037f45494501e03",
+        "0x2716263f762c08ee90849b92c32b310006c1b05cf59c44bb215d3c4460b17c4a",
+        "0x5a34476261274bfaef27797a5eb06557fd9b4f020850e6ea12c66f3d3b524b3f"
+      ]
+    },
+    "0x362d2770028e1bbc5f936a0faf4ba45ee359091e": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": [
+        "0x1c72772a24204328a0088b19161ed6cafdaf43e8c018c5e56e207481025404bb",
+        "0x2716263f762c08ee90849b92c32b310006c1b05cf59c44bb215d3c4460b17c4a",
+        "0x5a34476261274bfaef27797a5eb06557fd9b4f020850e6ea12c66f3d3b524b3f"
+      ]
+    },
+    "0x17a3919e7d455974d9065db75c8818eb6f1fb9f1": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": [
+        "0xae82008ac7d08a3fd67da82b6facf453b73b75c545382eec0e4d9495dc3bab69",
+        "0x2829e0253310c3d18734c432244e5a4293bbaba8504607499b5cc8205cc4f32c"
+      ]
+    },
+    "0x4f7ca206161527e06ea25cb4c037c2af5e9243ae": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": [
+        "0x105bd164f70a0535ffa45a8c6bfa6352569f349a73d8a3217c56272c549752bb",
+        "0x2829e0253310c3d18734c432244e5a4293bbaba8504607499b5cc8205cc4f32c"
+      ]
+    }
+  }
+}
