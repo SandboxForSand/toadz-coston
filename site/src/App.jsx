@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACTS, COSTON2_CHAIN, FLARE_CHAIN, ABIS, LOCK_TIERS, OG_COLLECTIONS } from './contracts-7.js';
-import merkleTreeData from '../jsons/merkle-tree.json';
+import { CONTRACTS, COSTON2_CHAIN, ABIS, LOCK_TIERS, OG_COLLECTIONS } from './contracts.js';
+const merkleTreeData = { proofs: {}, root: '0x' + '0'.repeat(64) }; // Placeholder for testnet
 
 // TadzClaimer on Flare
 const TADZ_CLAIMER = {
