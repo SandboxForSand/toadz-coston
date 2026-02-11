@@ -200,6 +200,8 @@ const ToadzFinal = () => {
   });
   const [allLockers, setAllLockers] = useState([]); // [{ address, count }]
   const [loading, setLoading] = useState(false);
+  const [inflowHistory, setInflowHistory] = useState([]);
+  const [loadingInflowHistory, setLoadingInflowHistory] = useState(false);
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
 
@@ -789,6 +791,110 @@ setLockExpired(isExpired);
     }
   };
 
+  const loadInflowHistory = async () => {
+    if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') return;
+
+    setLoadingInflowHistory(true);
+    try {
+      const readProvider = provider || new ethers.BrowserProvider(window.ethereum);
+      const latestBlock = await readProvider.getBlockNumber();
+      const lookbackWindows = [600000, 300000, 150000];
+
+      const fetchRecentLogs = async (address, topic) => {
+        let lastError = null;
+        for (const windowSize of lookbackWindows) {
+          const fromBlock = latestBlock > windowSize ? latestBlock - windowSize : 0;
+          try {
+            return await readProvider.getLogs({
+              address,
+              fromBlock,
+              toBlock: 'latest',
+              topics: [topic]
+            });
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        if (lastError) throw lastError;
+        return [];
+      };
+
+      const stakeInterface = new ethers.Interface([
+        'event PGSReceived(uint256 amount)',
+        'event FTSORewardsClaimed(uint24 indexed epochId, uint256 amount)'
+      ]);
+      const bufferInterface = new ethers.Interface([
+        'event WithdrawnToStake(address indexed to, uint256 amount)'
+      ]);
+
+      const [pgsLogs, ftsoLogs, pondBurnLogs] = await Promise.all([
+        fetchRecentLogs(CONTRACTS.ToadzStake, ethers.id('PGSReceived(uint256)')),
+        fetchRecentLogs(CONTRACTS.ToadzStake, ethers.id('FTSORewardsClaimed(uint24,uint256)')),
+        fetchRecentLogs(CONTRACTS.Buffer, ethers.id('WithdrawnToStake(address,uint256)'))
+      ]);
+
+      const entries = [];
+
+      for (const log of pgsLogs) {
+        const parsed = stakeInterface.parseLog(log);
+        entries.push({
+          category: 'PGS',
+          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+          label: 'POND floor payout',
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        });
+      }
+
+      for (const log of ftsoLogs) {
+        const parsed = stakeInterface.parseLog(log);
+        entries.push({
+          category: 'FTSO',
+          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+          label: `Epoch ${parsed.args.epochId.toString()}`,
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        });
+      }
+
+      for (const log of pondBurnLogs) {
+        const parsed = bufferInterface.parseLog(log);
+        entries.push({
+          category: 'POND burn',
+          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+          label: 'Restake buyback',
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        });
+      }
+
+      const uniqueBlocks = [...new Set(entries.map((item) => item.blockNumber))];
+      const blockTimestampMap = new Map();
+      await Promise.all(uniqueBlocks.map(async (blockNumber) => {
+        const block = await readProvider.getBlock(blockNumber);
+        blockTimestampMap.set(blockNumber, block?.timestamp || 0);
+      }));
+
+      const history = entries
+        .map((item) => ({
+          ...item,
+          timestamp: blockTimestampMap.get(item.blockNumber) || 0,
+          id: `${item.txHash}-${item.logIndex}`
+        }))
+        .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
+        .slice(0, 12);
+
+      setInflowHistory(history);
+    } catch (err) {
+      console.log('Failed to load inflow history:', err);
+    } finally {
+      setLoadingInflowHistory(false);
+    }
+  };
+
   // Refresh data periodically
   useEffect(() => {
     if (connected && walletAddress && Object.keys(contracts).length > 0) {
@@ -798,6 +904,20 @@ setLockExpired(isExpired);
       return () => clearInterval(interval);
     }
   }, [connected, walletAddress, contracts]);
+
+  useEffect(() => {
+    if (!connected || !walletAddress) {
+      setInflowHistory([]);
+      return;
+    }
+
+    loadInflowHistory();
+    const interval = setInterval(() => {
+      loadInflowHistory();
+    }, 120000);
+
+    return () => clearInterval(interval);
+  }, [connected, walletAddress, provider]);
 
   // Auto-reconnect wallet on page load
   useEffect(() => {
@@ -953,6 +1073,22 @@ useEffect(() => {
     if (value >= 4) return 2;
     if (value >= 2) return 1;
     return 0;
+  };
+
+  const formatDisplayAmount = (value, maxFractionDigits = 2) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return num.toLocaleString(undefined, { maximumFractionDigits: maxFractionDigits });
+  };
+
+  const formatHistoryDate = (timestamp) => {
+    if (!timestamp) return 'Pending';
+    return new Date(timestamp * 1000).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Contract actions
@@ -5401,9 +5537,12 @@ useEffect(() => {
           <div style={{ fontSize: 48, fontWeight: 900, color: '#00ff88', lineHeight: 1 }}>
             +{user.totalDeposited > 0 ? ((user.totalEarned / user.totalDeposited) * 100).toFixed(1) : '0'}%
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-            <div>Position <span style={{ color: '#fff', fontWeight: 600 }}>{user.totalPosition.toLocaleString()} FLR</span></div>
-            <div>Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{user.totalEarned.toFixed(2)} FLR</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+            <div>
+              <div>FLR Position <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(user.totalPosition)} FLR</span></div>
+              <div style={{ marginTop: 4 }}>POND Position <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(user.pondStaked)} POND</span></div>
+            </div>
+            <div style={{ textAlign: 'right' }}>Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span></div>
           </div>
         </div>
         )}
@@ -5524,7 +5663,65 @@ useEffect(() => {
         </div>
         )}
 
-        {/* BOX 3: Boost with FOMO Slider */}
+        {/* BOX 3: Recent FLR inflows by category */}
+        {user.lpPosition > 0 && !lockExpired && (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 14,
+          padding: 16,
+          marginBottom: 12
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Recent FLR Inflows</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>Pool history by source: PGS, FTSO, POND burn</div>
+
+          {loadingInflowHistory ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
+          ) : inflowHistory.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {inflowHistory.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'rgba(0,0,0,0.25)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 10,
+                    padding: '10px 12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
+                        background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
+                        border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
+                        borderRadius: 999,
+                        padding: '2px 7px'
+                      }}
+                    >
+                      {item.category}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* BOX 4: Boost with FOMO Slider */}
         {user.lpPosition > 0 && !lockExpired && (
         <div style={{
           background: 'linear-gradient(135deg, rgba(236,72,153,0.08) 0%, rgba(168,85,247,0.05) 100%)',
