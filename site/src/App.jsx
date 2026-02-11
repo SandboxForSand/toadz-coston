@@ -680,9 +680,11 @@ const syncToFlare = async () => {
       setProvider(web3Provider);
       setSigner(web3Signer);
       
-      // Get native balance
-      const balance = await web3Provider.getBalance(address);
-      setWalletBalance(Number(ethers.formatEther(balance)));
+      // Get native balance + WFLR balance (show combined available)
+      const nativeBalance = await web3Provider.getBalance(address);
+      const wflrContract = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
+      const wflrBalance = await wflrContract.balanceOf(address);
+      setWalletBalance(Number(ethers.formatEther(nativeBalance + wflrBalance)));
       
       // Setup contracts
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
@@ -953,38 +955,47 @@ useEffect(() => {
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
 
-      const totalFlr = ethers.parseEther(amount.toString());
+      const stakeAmount = ethers.parseEther(amount.toString());
 
-      // 1. Wrap C2FLR → WFLR
-      showToast('info', 'Wrapping C2FLR...');
-      const wrapTx = await wflr.deposit({ value: totalFlr });
-      await wrapTx.wait();
+      // Figure out how much POND is needed for this stake
+      const pondRequired = await toadzStake.getPondRequired(stakeAmount);
+      const existingPond = await pond.balanceOf(address);
+      const pondToBuy = pondRequired > existingPond ? pondRequired - existingPond : 0n;
 
-      // 2. Figure out how much POND is needed
-      const pondRequired = await toadzStake.getPondRequired(totalFlr);
+      // Calculate WFLR needed for POND purchase
+      let wflrForPond = 0n;
+      if (pondToBuy > 0n) {
+        const [cost] = await pond.getCostForPond(pondToBuy);
+        wflrForPond = cost;
+      }
 
-      if (pondRequired > 0n) {
-        // Check existing POND balance
-        const pondBal = await pond.balanceOf(address);
-        if (pondBal < pondRequired) {
-          // Buy POND with some WFLR
-          const pondToBuy = pondRequired - pondBal;
-          const [pondCost] = await pond.getCostForPond(pondToBuy);
+      // Total WFLR needed = stake amount + WFLR to buy POND
+      const totalWflrNeeded = stakeAmount + wflrForPond;
+      const existingWflr = await wflr.balanceOf(address);
+      const needToWrap = totalWflrNeeded > existingWflr ? totalWflrNeeded - existingWflr : 0n;
 
-          // Approve WFLR for POND purchase
-          const allowancePond = await wflr.allowance(address, CONTRACTS.POND);
-          if (allowancePond < pondCost) {
-            showToast('info', 'Approving WFLR for POND...');
-            const appTx = await wflr.approve(CONTRACTS.POND, ethers.MaxUint256);
-            await appTx.wait();
-          }
+      // 1. Wrap only what's needed
+      if (needToWrap > 0n) {
+        showToast('info', 'Wrapping C2FLR...');
+        const wrapTx = await wflr.deposit({ value: needToWrap });
+        await wrapTx.wait();
+      }
 
-          showToast('info', 'Buying POND...');
-          const buyTx = await pond.buy(pondCost);
-          await buyTx.wait();
+      // 2. Buy POND if needed
+      if (pondToBuy > 0n) {
+        const allowancePond = await wflr.allowance(address, CONTRACTS.POND);
+        if (allowancePond < wflrForPond) {
+          showToast('info', 'Approving WFLR for POND...');
+          const appTx = await wflr.approve(CONTRACTS.POND, ethers.MaxUint256);
+          await appTx.wait();
         }
+        showToast('info', 'Buying POND...');
+        const buyTx = await pond.buy(wflrForPond);
+        await buyTx.wait();
+      }
 
-        // Approve POND for staking
+      // 3. Approve POND for staking
+      if (pondRequired > 0n) {
         const pondAllowance = await pond.allowance(address, CONTRACTS.ToadzStake);
         if (pondAllowance < pondRequired) {
           showToast('info', 'Approving POND...');
@@ -993,17 +1004,17 @@ useEffect(() => {
         }
       }
 
-      // 3. Approve WFLR for staking
+      // 4. Approve WFLR for staking
       const wflrAllowance = await wflr.allowance(address, CONTRACTS.ToadzStake);
-      if (wflrAllowance < totalFlr) {
+      if (wflrAllowance < stakeAmount) {
         showToast('info', 'Approving WFLR...');
         const appTx = await wflr.approve(CONTRACTS.ToadzStake, ethers.MaxUint256);
         await appTx.wait();
       }
 
-      // 4. Deposit
+      // 5. Deposit
       showToast('info', 'Depositing...');
-      const tx = await toadzStake.deposit(totalFlr, tier, referrerFromUrl || ethers.ZeroAddress, { gasLimit: 3000000 });
+      const tx = await toadzStake.deposit(stakeAmount, tier, referrerFromUrl || ethers.ZeroAddress, { gasLimit: 3000000 });
       await tx.wait();
       
       showToast('success', 'Deposit successful!');
