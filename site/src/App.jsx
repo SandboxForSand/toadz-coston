@@ -846,7 +846,7 @@ setLockExpired(isExpired);
             parsedEntries.push({
               category: 'PGS',
               amountFlr: Number(ethers.formatEther(parsed.args.amount)),
-              label: 'POND floor payout',
+              label: 'PGS',
               txHash: log.transactionHash,
               blockNumber: log.blockNumber,
               logIndex: log.index
@@ -5822,7 +5822,9 @@ useEffect(() => {
                           >
                             {item.category}
                           </span>
-                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+                            {item.category === 'PGS' ? 'PGS' : item.label}
+                          </span>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
