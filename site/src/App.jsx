@@ -5801,14 +5801,15 @@ useEffect(() => {
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
+                          gap: 10,
                           alignItems: 'center',
                           background: 'rgba(0,0,0,0.25)',
                           border: '1px solid rgba(255,255,255,0.06)',
                           borderRadius: 10,
-                          padding: '10px 12px'
+                          padding: isDesktop ? '10px 12px' : '9px 10px'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                           <span
                             style={{
                               fontSize: 10,
@@ -5823,14 +5824,36 @@ useEffect(() => {
                             {item.category}
                           </span>
                           {item.category !== 'PGS' && (
-                            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color: 'rgba(255,255,255,0.7)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: isDesktop ? 220 : 130
+                              }}
+                            >
                               {item.label}
                             </span>
                           )}
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
+                        <div
+                          style={{
+                            textAlign: 'right',
+                            minWidth: isDesktop ? 116 : 104,
+                            flexShrink: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-end'
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88', whiteSpace: 'nowrap' }}>
+                            +{formatDisplayAmount(item.amountFlr)} FLR
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                            {formatHistoryDate(item.timestamp)}
+                          </div>
                         </div>
                       </div>
                     ))}
