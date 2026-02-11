@@ -565,19 +565,22 @@ const ToadzFinal = () => {
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, rpcProvider);
       const buffer = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, rpcProvider);
       
-      const [totalWflr, totalPond, cap, totalPGS, stakeFtso, bufferFtso] = await Promise.all([
+      const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, rpcProvider);
+      const [totalWflr, totalPond, cap, totalPGS, stakeFtso, bufferFtso, pondPrice] = await Promise.all([
         toadzStake.totalWflrStaked(),
         toadzStake.totalPondStaked(),
         toadzStake.poolCap(),
         toadzStake.totalPGSDistributed().catch(() => 0n),
         toadzStake.totalFtsoRewardsClaimed().catch(() => 0n),
         buffer.totalFtsoRewardsClaimed().catch(() => 0n),
+        pond.getCurrentPrice().catch(() => ethers.parseEther("0.5")),
       ]);
-      
+
       // Top staker return - skip indexer on testnet
       let topReturn = 0;
-      
+
       setPoolStats({
+        pondPrice: Number(ethers.formatEther(pondPrice)),
         totalWflr: Number(ethers.formatEther(totalWflr)),
         totalPond: Number(ethers.formatEther(totalPond)),
         cap: Number(ethers.formatEther(cap)),
@@ -5105,22 +5108,32 @@ useEffect(() => {
     const totalAvailable = walletFlr + walletWflr;
     const suggestedAdd = Math.floor(totalAvailable / 2);
     
-    // Auto-split calculation (at 0.847 POND price)
+    // Auto-split: POND required = FLR^0.7 (from contract getPondRequired)
+    // User enters total FLR. We stake stakeAmount WFLR and need stakeAmount^0.7 POND.
+    // Some FLR is used to buy POND, rest is staked as WFLR.
     const calcSplit = (flrAmount) => {
-      const pondPrice = 0.847;
-      // Need equal FLR and POND. X FLR buys X/0.847 POND. Remaining FLR = total - X.
-      // We need: remaining = X/0.847, so remaining * 0.847 = X, total - X = remaining
-      // total - X = X / 0.847 => total = X + X/0.847 => total = X(1 + 1/0.847)
-      // X = total / (1 + 1/0.847) = total / 2.181
-      const flrForPond = flrAmount / (1 + 1/pondPrice);
-      const pondReceived = flrForPond / pondPrice;
-      const flrRemaining = flrAmount - flrForPond;
-      const stakeAmount = Math.floor(Math.min(flrRemaining, pondReceived));
+      if (flrAmount <= 0) return { flrForPond: 0, pondReceived: 0, stakeFlr: 0, stakePond: 0 };
+      const pondPrice = poolStats.pondPrice || 0.5; // from contract getCurrentPrice
+      // Binary search: find max stakeAmount where stakeAmount + cost(stakeAmount^0.7 POND) <= flrAmount
+      let lo = 0, hi = flrAmount;
+      for (let i = 0; i < 30; i++) {
+        const mid = (lo + hi) / 2;
+        const pondNeeded = Math.pow(mid, 0.7);
+        const costForPond = pondNeeded * pondPrice;
+        if (mid + costForPond <= flrAmount) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      const stakeFlr = Math.floor(lo);
+      const pondNeeded = Math.pow(stakeFlr, 0.7);
+      const flrForPond = Math.ceil(pondNeeded * pondPrice);
       return {
-        flrForPond: Math.floor(flrForPond),
-        pondReceived: Math.floor(pondReceived),
-        stakeFlr: stakeAmount,
-        stakePond: stakeAmount
+        flrForPond,
+        pondReceived: Math.floor(pondNeeded),
+        stakeFlr,
+        stakePond: Math.floor(pondNeeded)
       };
     };
     
@@ -5228,7 +5241,7 @@ useEffect(() => {
                     borderTop: '1px solid rgba(0,255,136,0.2)' 
                   }}>
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>New pool share</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#00ff88' }}>6.8%</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#00ff88' }}>{poolInfo.totalWflr > 0 ? (((user.lpPosition + split.stakeFlr) / (poolInfo.totalWflr + split.stakeFlr)) * 100).toFixed(1) : '100'}%</span>
                   </div>
                 </div>
               )}
@@ -5720,11 +5733,11 @@ useEffect(() => {
               fontWeight: 700,
               color: 'rgba(255,255,255,0.5)'
             }}>
-             {depositFlr ? Math.floor(Number(depositFlr) * 0.222).toLocaleString() : '0'}
+             {depositFlr ? Math.floor(Math.pow(Number(depositFlr), 0.7)).toLocaleString() : '0'}
             </div>
-            {depositFlr && Math.floor(Number(depositFlr) * 0.222) > user.pondBalance && (
+            {depositFlr && Math.floor(Math.pow(Number(depositFlr), 0.7)) > user.pondBalance && (
               <div style={{ fontSize: 10, color: '#ffaa00', marginTop: 5 }}>
-                Need {Math.floor(Number(depositFlr) * 0.222 - user.pondBalance).toLocaleString()} more POND — will auto-buy from deposit
+                Need {Math.floor(Math.pow(Number(depositFlr), 0.7) - user.pondBalance).toLocaleString()} more POND — will auto-buy from deposit
               </div>
             )}
           </div>
