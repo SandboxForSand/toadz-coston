@@ -6,11 +6,11 @@ export const CONTRACTS = {
   BoostRegistry: '0x958aEEC535974465109f8f3411fA576249bd06ef',
   ToadzStake: '0xd973E756fCcB640108aAf17B3465a387802A6E49',
   ToadzMarket: '0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F',
+  Zap: '0xBeA2995513DCc193C39241E6Cd55AF53172a711E',
   // Not deployed on Coston2 yet:
   // OGVaultOracle: '',
   // ToadzMint: '',
   // FToadz: '',
-  // Zap: '',
 };
 
 // OG Vault eligible collections (lock forever for 2x)

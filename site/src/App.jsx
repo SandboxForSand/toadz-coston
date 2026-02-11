@@ -1120,6 +1120,68 @@ useEffect(() => {
       const selectedTier = Number.isInteger(Number(tier)) ? Number(tier) : currentTier;
       const lockTierToUse = hasActivePosition ? Math.max(currentTier, selectedTier) : selectedTier;
       const minStakeAmount = await toadzStake.minDeposit().catch(() => ethers.parseEther('1'));
+      const hasZap = Boolean(CONTRACTS.Zap) && CONTRACTS.Zap !== ethers.ZeroAddress;
+
+      // New stake path: one transaction via Zap (wrap + buy POND + deposit).
+      if (!hasActivePosition && hasZap) {
+        const zap = new ethers.Contract(CONTRACTS.Zap, ABIS.Zap, web3Signer);
+        const minPondBuy = ethers.parseEther('10');
+
+        const evaluateZapPlan = async (candidateStakeAmount) => {
+          if (candidateStakeAmount <= 0n) {
+            return { stakeAmount: 0n, totalNeeded: 0n };
+          }
+
+          const [, pondCost, pondToBuy] = await zap.previewDeposit(candidateStakeAmount, address);
+          let pondBuyBudget = 0n;
+          if (pondToBuy > 0n) {
+            pondBuyBudget = pondCost + (pondCost / 50n); // Match Zap's 2% buffer.
+            if (pondBuyBudget < minPondBuy) pondBuyBudget = minPondBuy;
+          }
+          return {
+            stakeAmount: candidateStakeAmount,
+            totalNeeded: candidateStakeAmount + pondBuyBudget
+          };
+        };
+
+        let low = 0n;
+        let high = inputBudget;
+        let bestZapPlan = await evaluateZapPlan(0n);
+
+        for (let i = 0; i < 28 && low <= high; i++) {
+          const mid = (low + high) / 2n;
+          const plan = await evaluateZapPlan(mid);
+          if (plan.totalNeeded <= inputBudget) {
+            bestZapPlan = plan;
+            low = mid + 1n;
+          } else {
+            if (mid === 0n) break;
+            high = mid - 1n;
+          }
+        }
+
+        if (bestZapPlan.stakeAmount < minStakeAmount) {
+          throw new Error(
+            `Amount too low after POND allocation. Minimum staked FLR is ${formatDisplayAmount(Number(ethers.formatEther(minStakeAmount)), 4)}.`
+          );
+        }
+
+        showToast('info', 'Depositing (single transaction)...');
+        const tx = await zap.zapDeposit(
+          bestZapPlan.stakeAmount,
+          lockTierToUse,
+          referrerFromUrl || ethers.ZeroAddress,
+          { value: inputBudget, gasLimit: 3000000 }
+        );
+        await tx.wait();
+
+        showToast('success', 'Deposit successful!');
+        await loadUserData(walletAddress, contracts);
+        setShowCustomDeposit(false);
+        setDepositFlr('');
+        setLoading(false);
+        return;
+      }
 
       // Calculate incremental POND requirement using unstaked balance only.
       const totalPondBalance = await pond.balanceOf(address);
