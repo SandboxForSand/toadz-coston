@@ -202,6 +202,7 @@ const ToadzFinal = () => {
   const [loading, setLoading] = useState(false);
   const [inflowHistory, setInflowHistory] = useState([]);
   const [loadingInflowHistory, setLoadingInflowHistory] = useState(false);
+  const [showInflowHistory, setShowInflowHistory] = useState(false);
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
 
@@ -798,27 +799,6 @@ setLockExpired(isExpired);
     try {
       const readProvider = provider || new ethers.BrowserProvider(window.ethereum);
       const latestBlock = await readProvider.getBlockNumber();
-      const lookbackWindows = [600000, 300000, 150000];
-
-      const fetchRecentLogs = async (address, topic) => {
-        let lastError = null;
-        for (const windowSize of lookbackWindows) {
-          const fromBlock = latestBlock > windowSize ? latestBlock - windowSize : 0;
-          try {
-            return await readProvider.getLogs({
-              address,
-              fromBlock,
-              toBlock: 'latest',
-              topics: [topic]
-            });
-          } catch (err) {
-            lastError = err;
-          }
-        }
-        if (lastError) throw lastError;
-        return [];
-      };
-
       const stakeInterface = new ethers.Interface([
         'event PGSReceived(uint256 amount)',
         'event FTSORewardsClaimed(uint24 indexed epochId, uint256 amount)'
@@ -827,48 +807,72 @@ setLockExpired(isExpired);
         'event WithdrawnToStake(address indexed to, uint256 amount)'
       ]);
 
-      const [pgsLogs, ftsoLogs, pondBurnLogs] = await Promise.all([
-        fetchRecentLogs(CONTRACTS.ToadzStake, ethers.id('PGSReceived(uint256)')),
-        fetchRecentLogs(CONTRACTS.ToadzStake, ethers.id('FTSORewardsClaimed(uint24,uint256)')),
-        fetchRecentLogs(CONTRACTS.Buffer, ethers.id('WithdrawnToStake(address,uint256)'))
-      ]);
+      const TOPIC_PGS = ethers.id('PGSReceived(uint256)');
+      const TOPIC_FTSO = ethers.id('FTSORewardsClaimed(uint24,uint256)');
+      const TOPIC_BURN = ethers.id('WithdrawnToStake(address,uint256)');
 
+      // Coston2 RPC currently enforces small eth_getLogs ranges, so scan in tiny chunks backwards.
+      const chunkSize = 30;
+      const maxChunks = 300; // 9,000 blocks max search depth.
+      const targetEntries = 16;
       const entries = [];
 
-      for (const log of pgsLogs) {
-        const parsed = stakeInterface.parseLog(log);
-        entries.push({
-          category: 'PGS',
-          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
-          label: 'POND floor payout',
-          txHash: log.transactionHash,
-          blockNumber: log.blockNumber,
-          logIndex: log.index
-        });
-      }
+      let toBlock = latestBlock;
+      for (let i = 0; i < maxChunks && entries.length < targetEntries && toBlock >= 0; i++) {
+        const fromBlock = Math.max(0, toBlock - chunkSize + 1);
 
-      for (const log of ftsoLogs) {
-        const parsed = stakeInterface.parseLog(log);
-        entries.push({
-          category: 'FTSO',
-          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
-          label: `Epoch ${parsed.args.epochId.toString()}`,
-          txHash: log.transactionHash,
-          blockNumber: log.blockNumber,
-          logIndex: log.index
-        });
-      }
+        const [stakeLogs, burnLogs] = await Promise.all([
+          readProvider.getLogs({
+            address: CONTRACTS.ToadzStake,
+            fromBlock,
+            toBlock,
+            topics: [[TOPIC_PGS, TOPIC_FTSO]]
+          }).catch(() => []),
+          readProvider.getLogs({
+            address: CONTRACTS.Buffer,
+            fromBlock,
+            toBlock,
+            topics: [[TOPIC_BURN]]
+          }).catch(() => [])
+        ]);
 
-      for (const log of pondBurnLogs) {
-        const parsed = bufferInterface.parseLog(log);
-        entries.push({
-          category: 'POND burn',
-          amountFlr: Number(ethers.formatEther(parsed.args.amount)),
-          label: 'Restake buyback',
-          txHash: log.transactionHash,
-          blockNumber: log.blockNumber,
-          logIndex: log.index
-        });
+        for (const log of stakeLogs) {
+          const parsed = stakeInterface.parseLog(log);
+          if (log.topics[0] === TOPIC_PGS) {
+            entries.push({
+              category: 'PGS',
+              amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+              label: 'POND floor payout',
+              txHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+              logIndex: log.index
+            });
+          } else if (log.topics[0] === TOPIC_FTSO) {
+            entries.push({
+              category: 'FTSO',
+              amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+              label: `Epoch ${parsed.args.epochId.toString()}`,
+              txHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+              logIndex: log.index
+            });
+          }
+        }
+
+        for (const log of burnLogs) {
+          const parsed = bufferInterface.parseLog(log);
+          entries.push({
+            category: 'POND burn',
+            amountFlr: Number(ethers.formatEther(parsed.args.amount)),
+            label: 'Restake buyback',
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber,
+            logIndex: log.index
+          });
+        }
+
+        if (fromBlock === 0) break;
+        toBlock = fromBlock - 1;
       }
 
       const uniqueBlocks = [...new Set(entries.map((item) => item.blockNumber))];
@@ -908,6 +912,7 @@ setLockExpired(isExpired);
   useEffect(() => {
     if (!connected || !walletAddress) {
       setInflowHistory([]);
+      setShowInflowHistory(false);
       return;
     }
 
@@ -5679,49 +5684,75 @@ useEffect(() => {
           padding: 16,
           marginBottom: 12
         }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Recent FLR Inflows</div>
+          <button
+            onClick={() => setShowInflowHistory((prev) => !prev)}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              cursor: 'pointer',
+              textAlign: 'left'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Recent FLR Inflows</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                {loadingInflowHistory ? 'Syncing...' : inflowHistory.length > 0 ? `${inflowHistory.length} recent event${inflowHistory.length > 1 ? 's' : ''}` : 'No recent inflows'}
+              </div>
+            </div>
+            <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>{showInflowHistory ? '▾' : '▸'}</div>
+          </button>
 
-          {loadingInflowHistory ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
-          ) : inflowHistory.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {inflowHistory.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: 'rgba(0,0,0,0.25)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: 10,
-                    padding: '10px 12px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
+          {showInflowHistory && (
+            <div style={{ marginTop: 12 }}>
+              {loadingInflowHistory ? (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Loading inflow history...</div>
+              ) : inflowHistory.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {inflowHistory.map((item) => (
+                    <div
+                      key={item.id}
                       style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
-                        background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
-                        border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
-                        borderRadius: 999,
-                        padding: '2px 7px'
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: 'rgba(0,0,0,0.25)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: 10,
+                        padding: '10px 12px'
                       }}
                     >
-                      {item.category}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: item.category === 'PGS' ? '#22c55e' : item.category === 'FTSO' ? '#60a5fa' : '#f59e0b',
+                            background: item.category === 'PGS' ? 'rgba(34,197,94,0.12)' : item.category === 'FTSO' ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.12)',
+                            border: item.category === 'PGS' ? '1px solid rgba(34,197,94,0.25)' : item.category === 'FTSO' ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(245,158,11,0.25)',
+                            borderRadius: 999,
+                            padding: '2px 7px'
+                          }}
+                        >
+                          {item.category}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.label}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88' }}>+{formatDisplayAmount(item.amountFlr)} FLR</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{formatHistoryDate(item.timestamp)}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
