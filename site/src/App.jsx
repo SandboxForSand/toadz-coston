@@ -176,6 +176,9 @@ const ToadzFinal = () => {
 
   const isDesktop = windowWidth >= 768;
   const inflowCacheKey = `toadz_inflow_history_v3_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}`;
+  const INFLOW_CHUNK_SIZE = 30;
+  const INFLOW_LOOKBACK_BLOCKS = 360;
+  const INFLOW_MAX_ITEMS = 12;
 
   // Contract state
   const [provider, setProvider] = useState(null);
@@ -205,7 +208,6 @@ const ToadzFinal = () => {
   const [loading, setLoading] = useState(false);
   const [inflowHistory, setInflowHistory] = useState([]);
   const [loadingInflowHistory, setLoadingInflowHistory] = useState(false);
-  const [inflowSyncing, setInflowSyncing] = useState(false);
   const [showInflowHistory, setShowInflowHistory] = useState(false);
   const inflowHistoryRef = useRef([]);
   const inflowSyncInFlightRef = useRef(false);
@@ -845,7 +847,6 @@ const syncToFlare = async () => {
     const existingHistory = inflowHistoryRef.current;
     const hasExisting = existingHistory.length > 0;
     if (!hasExisting) setLoadingInflowHistory(true);
-    else setInflowSyncing(true);
 
     try {
       const readProvider = getReadProvider();
@@ -931,49 +932,20 @@ const syncToFlare = async () => {
       };
 
       let nextHistory = [...existingHistory];
-      const chunkSize = 30;
-
-      if (hasExisting) {
-        // Incremental sync: only scan blocks after the newest known event.
-        const newestKnownBlock = existingHistory.reduce(
-          (max, item) => Math.max(max, item.blockNumber || 0),
-          0
-        );
-        if (newestKnownBlock < latestBlock) {
-          const incrementalEntries = [];
-          for (let fromBlock = newestKnownBlock + 1; fromBlock <= latestBlock; fromBlock += chunkSize) {
-            const toBlock = Math.min(latestBlock, fromBlock + chunkSize - 1);
-            const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
-            incrementalEntries.push(...chunkEntries);
-          }
-
-          if (incrementalEntries.length > 0) {
-            const unique = new Map();
-            [...existingHistory, ...incrementalEntries].forEach((item) => unique.set(item.id, item));
-            nextHistory = [...unique.values()]
-              .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
-              .slice(0, 12);
-          }
-        }
-      } else {
-        // Initial sync: short backward scan for quick first paint.
-        const maxChunks = 12; // 360 blocks max on first load (keeps RPC pressure low).
-        const targetEntries = 6;
-        const collectedEntries = [];
-        let toBlock = latestBlock;
-
-        for (let i = 0; i < maxChunks && collectedEntries.length < targetEntries && toBlock >= 0; i++) {
-          const fromBlock = Math.max(0, toBlock - chunkSize + 1);
-          const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
-          collectedEntries.push(...chunkEntries);
-          if (fromBlock === 0) break;
-          toBlock = fromBlock - 1;
-        }
-
-        nextHistory = collectedEntries
-          .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
-          .slice(0, 12);
+      // Fast mode: only scan a tight recent window so refresh stays instant.
+      const fromRecentBlock = Math.max(0, latestBlock - INFLOW_LOOKBACK_BLOCKS + 1);
+      const recentEntries = [];
+      for (let fromBlock = fromRecentBlock; fromBlock <= latestBlock; fromBlock += INFLOW_CHUNK_SIZE) {
+        const toBlock = Math.min(latestBlock, fromBlock + INFLOW_CHUNK_SIZE - 1);
+        const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
+        recentEntries.push(...chunkEntries);
       }
+
+      const unique = new Map();
+      [...existingHistory, ...recentEntries].forEach((item) => unique.set(item.id, item));
+      nextHistory = [...unique.values()]
+        .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
+        .slice(0, INFLOW_MAX_ITEMS);
 
       inflowHistoryRef.current = nextHistory;
       setInflowHistory(nextHistory);
@@ -984,7 +956,6 @@ const syncToFlare = async () => {
       console.log('Failed to load inflow history:', err);
     } finally {
       setLoadingInflowHistory(false);
-      setInflowSyncing(false);
       inflowSyncInFlightRef.current = false;
     }
   };
@@ -1010,7 +981,6 @@ const syncToFlare = async () => {
       inflowHistoryRef.current = [];
       setShowInflowHistory(false);
       setLoadingInflowHistory(false);
-      setInflowSyncing(false);
       return;
     }
 
@@ -5887,8 +5857,8 @@ useEffect(() => {
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Recent FLR Inflows</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
                 {inflowHistory.length > 0
-                  ? `${inflowHistory.length} recent event${inflowHistory.length > 1 ? 's' : ''}${inflowSyncing ? ' • syncing' : ''}`
-                  : (loadingInflowHistory || inflowSyncing ? 'Syncing...' : 'No recent inflows')}
+                  ? `${inflowHistory.length} recent event${inflowHistory.length > 1 ? 's' : ''}`
+                  : (loadingInflowHistory ? 'Loading...' : 'No recent inflows')}
               </div>
             </div>
             <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>{showInflowHistory ? '▾' : '▸'}</div>
@@ -5902,11 +5872,6 @@ useEffect(() => {
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>No recent inflows found.</div>
               ) : (
                 <>
-                  {inflowSyncing && (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
-                      Syncing latest events...
-                    </div>
-                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {inflowHistory.map((item) => (
                       <div
