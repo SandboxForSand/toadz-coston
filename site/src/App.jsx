@@ -193,11 +193,7 @@ const ToadzFinal = () => {
     cap: 0,
     totalPGS: 0,
     totalFtsoRewards: 0,
-    topStakerReturn: 0,
-    bufferBalance: 0,
-    bufferLiability: 0,
-    bufferCoveragePct: 0,
-    bufferSurplusPct: 0
+    topStakerReturn: 0
   });
   const [boostData, setBoostData] = useState({ boost: 0, stakedNfts: [] });
   const [fomoFlrExtra, setFomoFlrExtra] = useState(0);
@@ -601,24 +597,18 @@ const ToadzFinal = () => {
       const buffer = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, rpcProvider);
       
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, rpcProvider);
-      const [totalWflr, totalPond, cap, totalPGS, stakeFtso, bufferFtso, pondPrice, bufferBalance, bufferLiability] = await Promise.all([
+      const [totalWflr, totalPond, cap, totalPGS, stakeFtso, bufferFtso, pondPrice] = await Promise.all([
         toadzStake.totalWflrStaked(),
         toadzStake.totalPondStaked(),
         toadzStake.poolCap(),
         toadzStake.totalPGSDistributed().catch(() => 0n),
         toadzStake.totalFtsoRewardsClaimed().catch(() => 0n),
         buffer.totalFtsoRewardsClaimed().catch(() => 0n),
-        pond.getCurrentPrice().catch(() => ethers.parseEther("0.5")),
-        buffer.getBalance().catch(() => 0n),
-        pond.getTotalLiability().catch(() => 0n),
+        pond.getCurrentPrice().catch(() => ethers.parseEther("0.5"))
       ]);
 
       // Top staker return - skip indexer on testnet
       let topReturn = 0;
-      const bufferBalanceNum = Number(ethers.formatEther(bufferBalance));
-      const bufferLiabilityNum = Number(ethers.formatEther(bufferLiability));
-      const bufferCoveragePct = bufferLiabilityNum > 0 ? (bufferBalanceNum / bufferLiabilityNum) * 100 : 0;
-      const bufferSurplusPct = bufferLiabilityNum > 0 ? ((bufferBalanceNum - bufferLiabilityNum) / bufferLiabilityNum) * 100 : 0;
 
       setPoolStats({
         pondPrice: Number(ethers.formatEther(pondPrice)),
@@ -627,11 +617,7 @@ const ToadzFinal = () => {
         cap: Number(ethers.formatEther(cap)),
         totalPGS: Number(ethers.formatEther(totalPGS)),
         totalFtsoRewards: Number(ethers.formatEther(stakeFtso)) + Number(ethers.formatEther(bufferFtso)),
-        topStakerReturn: topReturn,
-        bufferBalance: bufferBalanceNum,
-        bufferLiability: bufferLiabilityNum,
-        bufferCoveragePct,
-        bufferSurplusPct,
+        topStakerReturn: topReturn
       });
     } catch (err) {
       console.error('Failed to load public stats:', err);
@@ -780,8 +766,6 @@ const syncToFlare = async () => {
         stakeFtso,
         bufferFtso,
         pondPrice,
-        bufferBalance,
-        bufferLiability,
         latestBlock,
       ] = await Promise.all([
         toadzStakeRead.positions(address),
@@ -797,8 +781,6 @@ const syncToFlare = async () => {
         toadzStakeRead.totalFtsoRewardsClaimed().catch(() => 0n),
         bufferRead.totalFtsoRewardsClaimed().catch(() => 0n),
         pondRead.getCurrentPrice().catch(() => ethers.parseEther("0.5")),
-        bufferRead.getBalance().catch(() => 0n),
-        pondRead.getTotalLiability().catch(() => 0n),
         readProvider.getBlock('latest'),
       ]);
 
@@ -824,10 +806,6 @@ const syncToFlare = async () => {
       
       // Get pool stats
       const topReturn = 0; // Skip indexer on testnet
-      const bufferBalanceNum = Number(ethers.formatEther(bufferBalance));
-      const bufferLiabilityNum = Number(ethers.formatEther(bufferLiability));
-      const bufferCoveragePct = bufferLiabilityNum > 0 ? (bufferBalanceNum / bufferLiabilityNum) * 100 : 0;
-      const bufferSurplusPct = bufferLiabilityNum > 0 ? ((bufferBalanceNum - bufferLiabilityNum) / bufferLiabilityNum) * 100 : 0;
       setPoolStats({
         pondPrice: Number(ethers.formatEther(pondPrice)),
         totalWflr: Number(ethers.formatEther(totalWflr)),
@@ -835,11 +813,7 @@ const syncToFlare = async () => {
         cap: Number(ethers.formatEther(cap)),
         totalPGS: Number(ethers.formatEther(totalPGS)),
         totalFtsoRewards: Number(ethers.formatEther(stakeFtso)) + Number(ethers.formatEther(bufferFtso)),
-        topStakerReturn: topReturn,
-        bufferBalance: bufferBalanceNum,
-        bufferLiability: bufferLiabilityNum,
-        bufferCoveragePct,
-        bufferSurplusPct,
+        topStakerReturn: topReturn
       });
       
       // Get boost (may fail on Coston2 if ogVaultOracle is not a contract)
@@ -1832,11 +1806,7 @@ useEffect(() => {
     principalGrowthPct: poolStats.totalWflr > 0 ? (poolStats.totalPGS / poolStats.totalWflr * 100).toFixed(1) : '0',
     yieldPct: poolStats.totalWflr > 0 ? (poolStats.totalFtsoRewards / poolStats.totalWflr * 100).toFixed(1) : '0',
     totalPaid: poolStats.totalPGS + poolStats.totalFtsoRewards,
-    topStakerPct: (poolStats.topStakerReturn || 0).toFixed(1),
-    bufferBalance: poolStats.bufferBalance || 0,
-    bufferLiability: poolStats.bufferLiability || 0,
-    bufferCoveragePct: poolStats.bufferCoveragePct || 0,
-    bufferSurplusPct: poolStats.bufferSurplusPct || 0,
+    topStakerPct: (poolStats.topStakerReturn || 0).toFixed(1)
   };
 
   useEffect(() => {
@@ -5669,37 +5639,6 @@ useEffect(() => {
           </div>
         )}
 
-        {walletAddress && (
-          <div
-            style={{
-              background: 'linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,180,255,0.06) 100%)',
-              border: '1px solid rgba(0,255,136,0.18)',
-              borderRadius: 12,
-              padding: 14,
-              marginBottom: 12
-            }}
-          >
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-              Buffer Health
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: poolInfo.bufferCoveragePct >= 100 ? '#00ff88' : '#ff9f43' }}>
-                {poolInfo.bufferLiability > 0 ? `${poolInfo.bufferCoveragePct.toFixed(0)}%` : '—'}
-              </div>
-              <div style={{ fontSize: 12, color: poolInfo.bufferSurplusPct >= 0 ? '#00ff88' : '#ff9f43', fontWeight: 700 }}>
-                {poolInfo.bufferLiability > 0
-                  ? (poolInfo.bufferSurplusPct >= 0
-                    ? `+${poolInfo.bufferSurplusPct.toFixed(0)}% surplus`
-                    : `${Math.abs(poolInfo.bufferSurplusPct).toFixed(0)}% deficit`)
-                  : 'Awaiting liability data'}
-              </div>
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-              Buffer {formatDisplayAmount(poolInfo.bufferBalance)} WFLR • Liability {formatDisplayAmount(poolInfo.bufferLiability)} WFLR
-            </div>
-          </div>
-        )}
-        
         {/* Add Modal */}
         {showAddModal && (
           <div 
