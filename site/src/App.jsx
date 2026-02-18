@@ -5901,20 +5901,6 @@ useEffect(() => {
                           >
                             {item.category}
                           </span>
-                          {item.category !== 'PGS' && (
-                            <span
-                              style={{
-                                fontSize: 12,
-                                color: 'rgba(255,255,255,0.7)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                maxWidth: isDesktop ? 220 : 130
-                              }}
-                            >
-                              {item.label}
-                            </span>
-                          )}
                         </div>
                         <div
                           style={{
