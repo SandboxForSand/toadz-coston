@@ -82,6 +82,8 @@ const ToadzFinal = () => {
   const [lockExpired, setLockExpired] = useState(false);
   const [swapMode, setSwapMode] = useState(null);
   const [swapAmount, setSwapAmount] = useState('');
+  const [bufferTopupAmount, setBufferTopupAmount] = useState('');
+  const [bufferTopupLoading, setBufferTopupLoading] = useState(false);
   const [simFlr, setSimFlr] = useState('');
   
   // Vault page
@@ -1524,6 +1526,76 @@ useEffect(() => {
       showToast('error', 'Redeem failed: ' + (err.reason || err.message));
     }
     setLoading(false);
+  };
+
+  const handleWrapAndFundBuffer = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      showToast('error', 'Wallet not detected');
+      return;
+    }
+    if (!connected || !walletAddress) {
+      showToast('error', 'Please connect wallet');
+      return;
+    }
+
+    const amountText = (bufferTopupAmount || '').trim();
+    if (!amountText || Number(amountText) <= 0) {
+      showToast('error', 'Enter a valid C2FLR amount');
+      return;
+    }
+
+    let amountWei;
+    try {
+      amountWei = ethers.parseEther(amountText);
+    } catch {
+      showToast('error', 'Invalid amount format');
+      return;
+    }
+
+    setBufferTopupLoading(true);
+    try {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== COSTON2_CHAIN.chainId) {
+        await switchToFlare();
+      }
+
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const web3Signer = await web3Provider.getSigner();
+      const nativeBalance = await web3Provider.getBalance(walletAddress);
+      const gasReserve = ethers.parseEther('0.03');
+
+      if (nativeBalance <= amountWei + gasReserve) {
+        const availableToWrap = nativeBalance > gasReserve ? nativeBalance - gasReserve : 0n;
+        showToast(
+          'error',
+          `Not enough C2FLR after gas reserve. Max wrap now: ${Number(ethers.formatEther(availableToWrap)).toFixed(4)}`
+        );
+        return;
+      }
+
+      const wflr = new ethers.Contract(
+        CONTRACTS.WFLR,
+        [...ABIS.WFLR, 'function transfer(address to, uint256 amount) external returns (bool)'],
+        web3Signer
+      );
+
+      showToast('info', 'Wrapping C2FLR...');
+      const wrapTx = await wflr.deposit({ value: amountWei });
+      await wrapTx.wait();
+
+      showToast('info', 'Sending WFLR to Buffer...');
+      const sendTx = await wflr.transfer(CONTRACTS.Buffer, amountWei);
+      await sendTx.wait();
+
+      showToast('success', `Sent ${Number(amountText).toLocaleString()} WFLR to Buffer`);
+      setBufferTopupAmount('');
+      await loadUserData(walletAddress, contracts);
+    } catch (err) {
+      console.error('Wrap+fund buffer failed:', err);
+      showToast('error', 'Wrap+fund failed: ' + getReadableError(err));
+    } finally {
+      setBufferTopupLoading(false);
+    }
   };
 
   const handleStakeNFT = async (collection, tokenId) => {
@@ -6493,6 +6565,64 @@ useEffect(() => {
               )}
             </div>
           )}
+        </div>
+        )}
+
+        {/* Testnet helper: wrap C2FLR and fund Buffer for restake buyback */}
+        {connected && (
+        <div style={{
+          marginTop: 12,
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(0,255,136,0.12)',
+          borderRadius: 14,
+          padding: 14
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(0,255,136,0.75)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Testnet Helper
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.58)', marginBottom: 10 }}>
+            Wrap C2FLR and send WFLR to Buffer for restake buyback liquidity.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="number"
+              min="0"
+              step="0.0001"
+              value={bufferTopupAmount}
+              onChange={(e) => setBufferTopupAmount(e.target.value)}
+              placeholder="Amount in C2FLR"
+              style={{
+                flex: 1,
+                background: 'rgba(0,0,0,0.28)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 10,
+                padding: '12px',
+                fontSize: 14,
+                color: '#fff',
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={handleWrapAndFundBuffer}
+              disabled={bufferTopupLoading || !bufferTopupAmount || Number(bufferTopupAmount) <= 0}
+              style={{
+                background: bufferTopupLoading || !bufferTopupAmount || Number(bufferTopupAmount) <= 0 ? 'rgba(0,255,136,0.25)' : '#00ff88',
+                color: '#000',
+                border: 'none',
+                borderRadius: 10,
+                padding: '12px 14px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: bufferTopupLoading || !bufferTopupAmount || Number(bufferTopupAmount) <= 0 ? 'default' : 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {bufferTopupLoading ? 'Processing...' : 'Wrap + Fund Buffer'}
+            </button>
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
+            Buffer: {formatAddress(CONTRACTS.Buffer)}
+          </div>
         </div>
         )}
 
