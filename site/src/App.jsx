@@ -8412,17 +8412,46 @@ useEffect(() => {
                   setLoading(true);
 
                   const readProvider = getReadProvider();
-                  const [latestBlock, latestPosition] = await Promise.all([
+                  const stakeRead = new ethers.Contract(
+                    CONTRACTS.ToadzStake,
+                    [
+                      'function positions(address) view returns (uint256 wflrStaked, uint256 pondStaked, uint256 earnedWflr, uint256 lockExpiry, uint256 lockMultiplier, uint256 rewardDebt, uint256 lastUpdateTime)',
+                      'function RESTAKE_BUYBACK_PERCENT() view returns (uint256)'
+                    ],
+                    readProvider
+                  );
+                  const pondRead = new ethers.Contract(CONTRACTS.POND, ABIS.POND, readProvider);
+                  const bufferRead = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, readProvider);
+
+                  const [latestBlock, latestPosition, buybackPercent, avgPrice, bufferBalance] = await Promise.all([
                     readProvider.getBlock('latest'),
-                    contracts.toadzStake.positions(walletAddress),
+                    stakeRead.positions(walletAddress),
+                    stakeRead.RESTAKE_BUYBACK_PERCENT().catch(() => 10n),
+                    pondRead.getAveragePrice(walletAddress).catch(() => 0n),
+                    bufferRead.getBalance().catch(() => 0n),
                   ]);
                   const onChainNow = Number(latestBlock?.timestamp || 0);
                   const onChainLockExpiry = Number(latestPosition?.lockExpiry ?? latestPosition?.[3] ?? 0);
+                  const pondStaked = latestPosition?.pondStaked ?? latestPosition?.[1] ?? 0n;
+
+                  const pondBuyback = (pondStaked * buybackPercent) / 100n;
+                  const requiredBuybackWflr = (pondBuyback * avgPrice) / ethers.WeiPerEther;
 
                   if (onChainLockExpiry > onChainNow) {
                     const minsLeft = Math.max(1, Math.ceil((onChainLockExpiry - onChainNow) / 60));
                     showToast('error', `Lock not expired yet (${minsLeft}m remaining).`);
                     await loadUserData(walletAddress, contracts);
+                    return;
+                  }
+
+                  if (requiredBuybackWflr > bufferBalance) {
+                    const needed = Number(ethers.formatEther(requiredBuybackWflr));
+                    const available = Number(ethers.formatEther(bufferBalance));
+                    const shortfall = Number(ethers.formatEther(requiredBuybackWflr - bufferBalance));
+                    showToast(
+                      'error',
+                      `Restake blocked: buffer short ${shortfall.toFixed(2)} FLR (needs ${needed.toFixed(2)}, has ${available.toFixed(2)}).`
+                    );
                     return;
                   }
 
