@@ -90,6 +90,7 @@ export const ABIS = {
     'function totalSupply() view returns (uint256)',
     'function getCurrentPrice() view returns (uint256)',
     'function getCostForPond(uint256 pondAmount) view returns (uint256 totalCost, uint256 floorPortion, uint256 spread)',
+    'function getTotalLiability() view returns (uint256)',
     'function getAveragePrice(address user) view returns (uint256)',
     'function getAvailableBalance(address user) view returns (uint256)',
     'function redemptions(address user) view returns (uint256 totalOwed, uint256 totalClaimed, uint256 dripEndTime, uint256 dripStartTime)',
