@@ -207,8 +207,21 @@ const ToadzFinal = () => {
   const [showInflowHistory, setShowInflowHistory] = useState(false);
   const inflowHistoryRef = useRef([]);
   const inflowSyncInFlightRef = useRef(false);
+  const userDataInFlightRef = useRef(false);
+  const readProviderRef = useRef(null);
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
+
+  const getReadProvider = () => {
+    if (!readProviderRef.current) {
+      readProviderRef.current = new ethers.JsonRpcProvider(COSTON2_CHAIN.rpcUrls[0]);
+    }
+    return readProviderRef.current;
+  };
+
+  const getReadableError = (err) => {
+    return err?.reason || err?.shortMessage || err?.data?.message || err?.message || 'Unknown error';
+  };
 
   // Marketplace state
  const [marketListings, setMarketListings] = useState([]);
@@ -568,7 +581,7 @@ const ToadzFinal = () => {
   // Load public pool stats (no wallet needed)
   const loadPublicStats = async () => {
     try {
-      const rpcProvider = new ethers.JsonRpcProvider(COSTON2_CHAIN.rpcUrls[0]);
+      const rpcProvider = getReadProvider();
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, rpcProvider);
       const buffer = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, rpcProvider);
       
@@ -716,48 +729,72 @@ const syncToFlare = async () => {
 
   // Load user data from contracts
   const loadUserData = async (address, contractInstances) => {
+    if (!address) return;
+    if (userDataInFlightRef.current) return;
+
+    userDataInFlightRef.current = true;
     try {
-      const { toadzStake, pond, wflr, boostRegistry, toadzMint } = contractInstances;
-      
-      // Get position
-      const position = await toadzStake.positions(address);
-const pendingRewards = await toadzStake.getPendingRewards(address);
-const totalDeposited = await toadzStake.totalDeposited(address);
-const lockExpiry = Number(position[3]);
-const now = Math.floor(Date.now() / 1000);
-const isExpired = lockExpiry > 0 && lockExpiry < now;
+      const readProvider = getReadProvider();
+      const toadzStakeRead = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, readProvider);
+      const pondRead = new ethers.Contract(CONTRACTS.POND, ABIS.POND, readProvider);
+      const wflrRead = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, readProvider);
+      const boostRegistryRead = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.BoostRegistry, readProvider);
+      const bufferRead = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, readProvider);
 
-setUserPosition({
-  wflrStaked: Number(ethers.formatEther(position[0])),
-  pondStaked: Number(ethers.formatEther(position[1])),
-  earnedWflr: Number(ethers.formatEther(position[2])) + Number(ethers.formatEther(pendingRewards)),
-  lockExpiry: lockExpiry,
-  lockMultiplier: Number(position[4]),
-  totalDeposited: Number(ethers.formatEther(totalDeposited)),  
-});
+      const [
+        position,
+        pendingRewards,
+        totalDeposited,
+        pondBal,
+        wflrBal,
+        nativeBal,
+        totalWflr,
+        totalPond,
+        cap,
+        totalPGS,
+        stakeFtso,
+        bufferFtso,
+        pondPrice,
+        latestBlock,
+      ] = await Promise.all([
+        toadzStakeRead.positions(address),
+        toadzStakeRead.getPendingRewards(address),
+        toadzStakeRead.totalDeposited(address),
+        pondRead.balanceOf(address),
+        wflrRead.balanceOf(address),
+        readProvider.getBalance(address),
+        toadzStakeRead.totalWflrStaked(),
+        toadzStakeRead.totalPondStaked(),
+        toadzStakeRead.poolCap(),
+        toadzStakeRead.totalPGSDistributed().catch(() => 0n),
+        toadzStakeRead.totalFtsoRewardsClaimed().catch(() => 0n),
+        bufferRead.totalFtsoRewardsClaimed().catch(() => 0n),
+        pondRead.getCurrentPrice().catch(() => ethers.parseEther("0.5")),
+        readProvider.getBlock('latest'),
+      ]);
 
-setLockExpired(isExpired);
-      
+      const lockExpiry = Number(position[3]);
+      const onChainNow = Number(latestBlock?.timestamp || Math.floor(Date.now() / 1000));
+      const isExpired = lockExpiry > 0 && lockExpiry <= onChainNow;
+
+      setUserPosition({
+        wflrStaked: Number(ethers.formatEther(position[0])),
+        pondStaked: Number(ethers.formatEther(position[1])),
+        earnedWflr: Number(ethers.formatEther(position[2])) + Number(ethers.formatEther(pendingRewards)),
+        lockExpiry,
+        lockMultiplier: Number(position[4]),
+        totalDeposited: Number(ethers.formatEther(totalDeposited)),
+      });
+
+      setLockExpired(isExpired);
+
       // Get balances
-      const pondBal = await pond.balanceOf(address);
-      const wflrBal = await wflr.balanceOf(address);
       setPondBalance(Number(ethers.formatEther(pondBal)));
       setWflrBalance(Number(ethers.formatEther(wflrBal)));
+      setWalletBalance(Number(ethers.formatEther(nativeBal + wflrBal)));
       
       // Get pool stats
-      const totalWflr = await toadzStake.totalWflrStaked();
-      const totalPond = await toadzStake.totalPondStaked();
-      const cap = await toadzStake.poolCap();
-      const totalPGS = await toadzStake.totalPGSDistributed().catch(() => 0n);
-      const stakeFtso = await toadzStake.totalFtsoRewardsClaimed().catch(() => 0n);
-      const buffer = new ethers.Contract(CONTRACTS.Buffer, ABIS.Buffer, toadzStake.runner);
-      const bufferFtso = await buffer.totalFtsoRewardsClaimed().catch(() => 0n);
-      
-      // Top staker return - skip indexer on testnet
-      let topReturn = 0;
-      
-      const pondContract = new ethers.Contract(CONTRACTS.POND, ABIS.POND, toadzStake.runner);
-      const pondPrice = await pondContract.getCurrentPrice().catch(() => ethers.parseEther("0.5"));
+      const topReturn = 0; // Skip indexer on testnet
       setPoolStats({
         pondPrice: Number(ethers.formatEther(pondPrice)),
         totalWflr: Number(ethers.formatEther(totalWflr)),
@@ -769,13 +806,13 @@ setLockExpired(isExpired);
       });
       
       // Get boost (may fail on Coston2 if ogVaultOracle is not a contract)
-      try {
-        const boost = await boostRegistry.getUserBoost(address);
+      const boost = await boostRegistryRead.getUserBoost(address).catch(() => null);
+      if (boost !== null) {
         setBoostData({
           boost: Number(boost) / 1e18,
           stakedNfts: [],
         });
-      } catch (e) {
+      } else {
         console.log('Boost not available on testnet');
         setBoostData({ boost: 0, stakedNfts: [] });
       }
@@ -793,11 +830,13 @@ setLockExpired(isExpired);
       
     } catch (err) {
       console.error('Failed to load user data:', err);
+    } finally {
+      userDataInFlightRef.current = false;
     }
   };
 
   const loadInflowHistory = async () => {
-    if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') return;
+    if (typeof window === 'undefined') return;
     if (inflowSyncInFlightRef.current) return;
 
     inflowSyncInFlightRef.current = true;
@@ -807,7 +846,7 @@ setLockExpired(isExpired);
     else setInflowSyncing(true);
 
     try {
-      const readProvider = provider || new ethers.BrowserProvider(window.ethereum);
+      const readProvider = getReadProvider();
       const latestBlock = await readProvider.getBlockNumber();
       const stakeInterface = new ethers.Interface([
         'event PGSReceived(uint256 amount)',
@@ -916,8 +955,8 @@ setLockExpired(isExpired);
         }
       } else {
         // Initial sync: short backward scan for quick first paint.
-        const maxChunks = 40; // 1,200 blocks max.
-        const targetEntries = 8;
+        const maxChunks = 12; // 360 blocks max on first load (keeps RPC pressure low).
+        const targetEntries = 6;
         const collectedEntries = [];
         let toBlock = latestBlock;
 
@@ -953,7 +992,7 @@ setLockExpired(isExpired);
     if (connected && walletAddress && Object.keys(contracts).length > 0) {
       const interval = setInterval(() => {
         loadUserData(walletAddress, contracts);
-      }, 30000); // every 30 seconds
+      }, 90000); // every 90 seconds (reduces wallet RPC pressure)
       return () => clearInterval(interval);
     }
   }, [connected, walletAddress, contracts]);
@@ -963,7 +1002,8 @@ setLockExpired(isExpired);
   }, [inflowHistory]);
 
   useEffect(() => {
-    if (!connected || !walletAddress) {
+    const hasActiveStake = (userPosition?.wflrStaked || 0) > 0;
+    if (!connected || !walletAddress || !hasActiveStake) {
       setInflowHistory([]);
       inflowHistoryRef.current = [];
       setShowInflowHistory(false);
@@ -988,12 +1028,13 @@ setLockExpired(isExpired);
     }
 
     loadInflowHistory();
+    const intervalMs = showInflowHistory ? 120000 : 600000;
     const interval = setInterval(() => {
       loadInflowHistory();
-    }, 120000);
+    }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [connected, walletAddress, provider, inflowCacheKey]);
+  }, [connected, walletAddress, inflowCacheKey, showInflowHistory, userPosition?.wflrStaked]);
 
   // Auto-reconnect wallet on page load
   useEffect(() => {
@@ -8366,21 +8407,36 @@ useEffect(() => {
 
             <button 
               onClick={async () => { 
-                if (userPosition && userPosition.wflrStaked > 0) {
-                  try {
-  setLoading(true);
-  const tx = await contracts.toadzStake.restake(restakeLockTier, { gasLimit: 500000 });
-  await tx.wait();
-  await loadUserData(walletAddress, contracts);
-} catch (err) {
-  console.error('Restake failed:', err);
-  showToast('error', 'Restake failed: ' + (err.reason || err.message));
-} finally {
-  setLoading(false);
-}
+                if (!userPosition || userPosition.wflrStaked <= 0) return;
+                try {
+                  setLoading(true);
+
+                  const readProvider = getReadProvider();
+                  const [latestBlock, latestPosition] = await Promise.all([
+                    readProvider.getBlock('latest'),
+                    contracts.toadzStake.positions(walletAddress),
+                  ]);
+                  const onChainNow = Number(latestBlock?.timestamp || 0);
+                  const onChainLockExpiry = Number(latestPosition?.lockExpiry ?? latestPosition?.[3] ?? 0);
+
+                  if (onChainLockExpiry > onChainNow) {
+                    const minsLeft = Math.max(1, Math.ceil((onChainLockExpiry - onChainNow) / 60));
+                    showToast('error', `Lock not expired yet (${minsLeft}m remaining).`);
+                    await loadUserData(walletAddress, contracts);
+                    return;
+                  }
+
+                  const tx = await contracts.toadzStake.restake(restakeLockTier);
+                  await tx.wait();
+                  await loadUserData(walletAddress, contracts);
+                  setShowRestakeModal(false);
+                  setLockExpired(false);
+                } catch (err) {
+                  console.error('Restake failed:', err);
+                  showToast('error', 'Restake failed: ' + getReadableError(err));
+                } finally {
+                  setLoading(false);
                 }
-                setShowRestakeModal(false); 
-                setLockExpired(false); 
               }}
               disabled={loading}
               style={{
