@@ -595,9 +595,6 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         require(pos.lockExpiry <= block.timestamp, "Lock not expired");
         
         _updateRewards(msg.sender);
-        uint256 pending = getPendingRewards(msg.sender);
-        pos.earnedWflr += pending;
-        totalRewardsEarned[msg.sender] += pending;
         
         uint256 pondBuyback = (pos.pondStaked * RESTAKE_BUYBACK_PERCENT) / 100;
         uint256 avgPrice = IPOND(pond).getAveragePrice(msg.sender);
@@ -638,9 +635,6 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         require(pos.lockExpiry <= block.timestamp, "Lock not expired");
         
         _updateRewards(msg.sender);
-        uint256 pending = getPendingRewards(msg.sender);
-        pos.earnedWflr += pending;
-        totalRewardsEarned[msg.sender] += pending;
         
         uint256 totalWflrReturn = pos.wflrStaked + pos.earnedWflr;
         uint256 pondToUnlock = pos.pondStaked;
@@ -679,7 +673,7 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         require(authorizedSender[msg.sender] || msg.sender == owner(), "Not authorized");
         _distributeRewards(amount);
     }
-    
+
     function _distributeRewards(uint256 amount) internal {
         if (totalEffectiveShares == 0 || amount == 0) {
             if (buffer != address(0) && amount > 0) {
@@ -700,20 +694,32 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         
         uint256 pending = getPendingRewards(user);
         if (pending > 0) {
+            uint256 oldWeighted = getWeightedShares(user);
+            uint256 compoundAmount = pending;
+
             address ref = referrer[user];
             if (ref != address(0) && hasActivePosition(ref)) {
                 uint256 refCut = (pending * REFERRAL_PERCENT) / 100;
                 positions[ref].earnedWflr += refCut;
-                pending -= refCut;
+                compoundAmount = pending - refCut;
                 emit ReferralPaid(ref, user, refCut);
             }
-            
-            pos.earnedWflr += pending;
-            totalRewardsEarned[user] += pending;
+
+            if (compoundAmount > 0) {
+                // Auto-compound rewards into principal while preserving lock settings.
+                pos.wflrStaked += compoundAmount;
+                totalWflrStaked += compoundAmount;
+                totalRewardsEarned[user] += compoundAmount;
+
+                uint256 newWeighted = getWeightedShares(user);
+                totalWeightedShares = totalWeightedShares - oldWeighted + newWeighted;
+                _updateEffectiveShares(user, oldWeighted);
+            }
         }
         
         uint256 effective = getEffectiveShares(user);
         pos.rewardDebt = (effective * rewardIndex) / PRECISION;
+        pos.lastUpdateTime = block.timestamp;
     }
     
     function _updateEffectiveShares(address user, uint256 oldWeighted) internal {

@@ -789,9 +789,10 @@ const syncToFlare = async () => {
       const isExpired = lockExpiry > 0 && lockExpiry <= onChainNow;
 
       setUserPosition({
-        wflrStaked: Number(ethers.formatEther(position[0])),
+        // Treat pending rewards as principal-in-flight so UI reflects auto-compounding behavior.
+        wflrStaked: Number(ethers.formatEther(position[0] + pendingRewards)),
         pondStaked: Number(ethers.formatEther(position[1])),
-        earnedWflr: Number(ethers.formatEther(position[2])) + Number(ethers.formatEther(pendingRewards)),
+        earnedWflr: Number(ethers.formatEther(position[2])),
         lockExpiry,
         lockMultiplier: Number(position[4]),
         totalDeposited: Number(ethers.formatEther(totalDeposited)),
