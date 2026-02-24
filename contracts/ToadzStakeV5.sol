@@ -385,13 +385,16 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         return pos.wflrStaked * pos.lockMultiplier;
     }
     
-    function getEffectiveShares(address user) public view returns (uint256) {
-        uint256 weighted = getWeightedShares(user);
+    function _effectiveFromWeighted(address user, uint256 weighted) internal view returns (uint256) {
         if (!boostsEnabled || boostRegistry == address(0)) {
             return weighted;
         }
         uint256 boost = IBoostRegistry(boostRegistry).getUserBoost(user);
         return (weighted * (PRECISION + boost)) / PRECISION;
+    }
+
+    function getEffectiveShares(address user) public view returns (uint256) {
+        return _effectiveFromWeighted(user, getWeightedShares(user));
     }
     
     function getPendingRewards(address user) public view returns (uint256) {
@@ -548,6 +551,7 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         Position storage pos = positions[msg.sender];
         require(pos.wflrStaked > 0, "No position");
         require(wflrAmount >= minDeposit, "Below minimum");
+        require(totalDeposited[msg.sender] + wflrAmount <= maxDeposit, "Above maximum");
         require(totalWflrStaked + wflrAmount <= poolCap, "Pool cap reached");
 
         _updateRewards(msg.sender);
@@ -723,10 +727,7 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     }
     
     function _updateEffectiveShares(address user, uint256 oldWeighted) internal {
-        uint256 oldEffective = boostsEnabled && boostRegistry != address(0)
-            ? (oldWeighted * (PRECISION + IBoostRegistry(boostRegistry).getUserBoost(user))) / PRECISION
-            : oldWeighted;
-        
+        uint256 oldEffective = _effectiveFromWeighted(user, oldWeighted);
         uint256 newEffective = getEffectiveShares(user);
         totalEffectiveShares = totalEffectiveShares - oldEffective + newEffective;
     }
@@ -740,6 +741,10 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     // ============ Emergency Functions ============
     
     function emergencyWithdraw() external onlyOwner {
+        require(
+            totalWflrStaked == 0 && totalWeightedShares == 0 && totalEffectiveShares == 0,
+            "Active stake exists"
+        );
         uint256 balance = wflr.balanceOf(address(this));
         require(wflr.transfer(owner(), balance), "Transfer failed");
     }
@@ -761,13 +766,30 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         uint256 lockExpiry,
         uint256 lockMultiplier
     ) external onlyOwner {
+        Position storage oldPos = positions[user];
+        uint256 oldWeighted = oldPos.wflrStaked * oldPos.lockMultiplier;
+        uint256 oldEffective = _effectiveFromWeighted(user, oldWeighted);
+
+        require(totalWflrStaked >= oldPos.wflrStaked, "Bad totalWflrStaked");
+        require(totalPondStaked >= oldPos.pondStaked, "Bad totalPondStaked");
+        require(totalWeightedShares >= oldWeighted, "Bad totalWeightedShares");
+        require(totalEffectiveShares >= oldEffective, "Bad totalEffectiveShares");
+
+        uint256 newWeighted = wflrStaked * lockMultiplier;
+        uint256 newEffective = _effectiveFromWeighted(user, newWeighted);
+
+        totalWflrStaked = totalWflrStaked - oldPos.wflrStaked + wflrStaked;
+        totalPondStaked = totalPondStaked - oldPos.pondStaked + pondStaked;
+        totalWeightedShares = totalWeightedShares - oldWeighted + newWeighted;
+        totalEffectiveShares = totalEffectiveShares - oldEffective + newEffective;
+
         positions[user] = Position({
             wflrStaked: wflrStaked,
             pondStaked: pondStaked,
             earnedWflr: earnedWflr,
             lockExpiry: lockExpiry,
             lockMultiplier: lockMultiplier,
-            rewardDebt: 0,
+            rewardDebt: (newEffective * rewardIndex) / PRECISION,
             lastUpdateTime: block.timestamp
         });
     }

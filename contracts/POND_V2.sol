@@ -389,13 +389,14 @@ contract POND is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, 
     function burn(address from, uint256 amount) external {
         require(msg.sender == owner() || msg.sender == toadzStake, "Not authorized");
         require(balanceOf[from] >= amount, "Insufficient balance");
-        
-        if (stakedPond[from] >= amount) {
+
+        if (msg.sender == toadzStake) {
+            require(stakedPond[from] >= amount, "Insufficient staked POND");
             stakedPond[from] -= amount;
-        } else if (stakedPond[from] > 0) {
-            stakedPond[from] = 0;
+        } else {
+            require(getAvailableBalance(from) >= amount, "Cannot burn staked POND");
         }
-        
+
         balanceOf[from] -= amount;
         totalSupply -= amount;
         emit PondBurned(from, amount);
@@ -404,13 +405,14 @@ contract POND is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, 
     function burnForMint(address from, uint256 amount) external {
         require(msg.sender == owner() || msg.sender == toadzStake || isAuthorizedMinter[msg.sender], "Not authorized");
         require(balanceOf[from] >= amount, "Insufficient balance");
-        
-        if (stakedPond[from] >= amount) {
+
+        if (msg.sender == toadzStake) {
+            require(stakedPond[from] >= amount, "Insufficient staked POND");
             stakedPond[from] -= amount;
-        } else if (stakedPond[from] > 0) {
-            stakedPond[from] = 0;
+        } else {
+            require(getAvailableBalance(from) >= amount, "Cannot burn staked POND");
         }
-        
+
         balanceOf[from] -= amount;
         totalSupply -= amount;
         emit PondBurned(from, amount);

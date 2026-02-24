@@ -1,6 +1,6 @@
 # Toadz Coston2 Dev Handoff
 
-Last updated: 2026-02-20
+Last updated: 2026-02-24
 
 ## 1) Environment
 - Frontend: Vite app in `/Users/dantian/toadz-coston/site`
@@ -41,6 +41,14 @@ Reference file: `/Users/dantian/toadz-coston/site/src/contracts.js`
   - lock multiplier unchanged
 
 Contract file: `/Users/dantian/toadz-coston/contracts/ToadzStakeV5.sol`
+
+## 3.1) Security Patch Set (Source Updated, Upgrade Pending)
+- `POND.burn` / `burnForMint` now prevent non-stake callers from burning staked POND and require exact staked accounting for stake-origin burns.
+- `ToadzStake.addToStake` now enforces per-user `maxDeposit` across cumulative deposits (`totalDeposited + add <= maxDeposit`).
+- `ToadzStake.emergencyWithdraw` now requires no active stake accounting (`totalWflrStaked`, `totalWeightedShares`, `totalEffectiveShares` must be zero).
+- `ToadzStake.emergencyPushPosition` now:
+  - reconciles global totals against old position
+  - sets `rewardDebt = (effective * rewardIndex) / PRECISION` instead of zero.
 
 ## 4) Frontend Behavior Highlights
 - RPC pressure reduction:
@@ -100,6 +108,14 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `npx hardhat run scripts/deploy-zap-coston2.js --network coston2`
 - Upgrade stake proxy (Coston2):
   - `npx hardhat run scripts/upgrade-stake-coston2.js --network coston2`
+- Upgrade POND proxy (Coston2):
+  - `npx hardhat run scripts/upgrade-pond-coston2.js --network coston2`
+- Upgrade stake + POND together (Coston2):
+  - `npx hardhat run scripts/upgrade-core-coston2.js --network coston2`
+- Pre-upgrade consistency check (Coston2):
+  - `npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (default scans recent window)
+  - `FROM_BLOCK=1 npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (full-history; slower on Coston2 RPC)
+  - `CHECK_USERS=0xUser1,0xUser2 npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (targeted check)
 
 ## 9) Important Files
 - Frontend app:
@@ -112,3 +128,9 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `/Users/dantian/toadz-coston/scripts/deploy-zap-coston2.js`
 - Stake upgrade script:
   - `/Users/dantian/toadz-coston/scripts/upgrade-stake-coston2.js`
+- POND upgrade script:
+  - `/Users/dantian/toadz-coston/scripts/upgrade-pond-coston2.js`
+- Combined core upgrade script:
+  - `/Users/dantian/toadz-coston/scripts/upgrade-core-coston2.js`
+- POND/Stake consistency checker:
+  - `/Users/dantian/toadz-coston/scripts/check-pond-stake-consistency-coston2.js`
