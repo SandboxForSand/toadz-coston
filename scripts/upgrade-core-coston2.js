@@ -18,13 +18,16 @@ async function upgradeTarget(target) {
   console.log("Proxy:", target.proxy);
 
   const Factory = await ethers.getContractFactory(target.contract);
+  await upgrades.forceImport(target.proxy, Factory, { kind: "transparent" });
+  console.log("Proxy imported into manifest.");
   await upgrades.validateUpgrade(target.proxy, Factory);
 
   const beforeImpl = await upgrades.erc1967.getImplementationAddress(target.proxy);
   console.log("Previous implementation:", beforeImpl);
 
   const upgraded = await upgrades.upgradeProxy(target.proxy, Factory, {
-    kind: "transparent"
+    kind: "transparent",
+    redeployImplementation: "always"
   });
   await upgraded.waitForDeployment();
 

@@ -9,13 +9,16 @@ async function main() {
   console.log("Proxy:", POND_PROXY);
 
   const Pond = await ethers.getContractFactory("POND");
+  await upgrades.forceImport(POND_PROXY, Pond, { kind: "transparent" });
+  console.log("Proxy imported into manifest.");
   await upgrades.validateUpgrade(POND_PROXY, Pond);
 
   const beforeImpl = await upgrades.erc1967.getImplementationAddress(POND_PROXY);
   console.log("Previous implementation:", beforeImpl);
 
   const upgraded = await upgrades.upgradeProxy(POND_PROXY, Pond, {
-    kind: "transparent"
+    kind: "transparent",
+    redeployImplementation: "always"
   });
   await upgraded.waitForDeployment();
 

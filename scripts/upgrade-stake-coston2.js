@@ -9,13 +9,16 @@ async function main() {
   console.log("Proxy:", STAKE_PROXY);
 
   const Stake = await ethers.getContractFactory("ToadzStake");
+  await upgrades.forceImport(STAKE_PROXY, Stake, { kind: "transparent" });
+  console.log("Proxy imported into manifest.");
   await upgrades.validateUpgrade(STAKE_PROXY, Stake);
 
   const beforeImpl = await upgrades.erc1967.getImplementationAddress(STAKE_PROXY);
   console.log("Previous implementation:", beforeImpl);
 
   const upgraded = await upgrades.upgradeProxy(STAKE_PROXY, Stake, {
-    kind: "transparent"
+    kind: "transparent",
+    redeployImplementation: "always"
   });
   await upgraded.waitForDeployment();
 

@@ -20,6 +20,12 @@ Last updated: 2026-02-24
 
 Reference file: `/Users/dantian/toadz-coston/site/src/contracts.js`
 
+### Current implementations (post-upgrade, 2026-02-24)
+- `ToadzStake` implementation: `0x45f92298e5CC08Fb3f61A8751070B74A9FCE950b`
+- `POND` implementation: `0x09FbeF230E81B608A127C50D2D81B49535B23Cd9`
+- `ToadzStake` ProxyAdmin: `0xb0b19248D39c76cFC0a2D971FF41A3C24508688F`
+- `POND` ProxyAdmin: `0x6DF6a2983bC18F84823b9bC9037c80De3e5a0d83`
+
 ## 3) Core Mechanics (Current)
 - Native token is `C2FLR` (gas token), but staking system runs on `WFLR` (ERC20).
 - New stake (no active position): routed via `ZapDeposit.zapDeposit(...)` for one transaction.
@@ -85,6 +91,8 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
 - Restake failures with `Insufficient balance` are usually **Buffer WFLR liquidity**, not user wallet issue.
 - Inflow panel is protocol event-derived, not strictly per-user attribution.
 - Coston2 RPC can still intermittently rate limit under bursty usage.
+- Coston2 `eth_getLogs` currently limits range to ~30 blocks/request; event scans must chunk aggressively.
+- `ToadzStake` requires low-optimization + IR compile override to stay below deployable bytecode limit.
 
 ## 7) Pending / Recommended Next Tasks
 - Decide if test helper `Wrap + Fund Buffer` stays visible or should be admin-only/hidden.
@@ -112,6 +120,10 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `npx hardhat run scripts/upgrade-pond-coston2.js --network coston2`
 - Upgrade stake + POND together (Coston2):
   - `npx hardhat run scripts/upgrade-core-coston2.js --network coston2`
+- Manual validated upgrade (deploy new impl + ProxyAdmin.upgrade):
+  - `npx hardhat run scripts/manual-upgrade-core-coston2.js --network coston2`
+- Verify live implementation bytecode matches local:
+  - `npx hardhat run scripts/check-live-impl-bytecode-coston2.js --network coston2`
 - Pre-upgrade consistency check (Coston2):
   - `npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (default scans recent window)
   - `FROM_BLOCK=1 npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (full-history; slower on Coston2 RPC)
@@ -132,5 +144,11 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `/Users/dantian/toadz-coston/scripts/upgrade-pond-coston2.js`
 - Combined core upgrade script:
   - `/Users/dantian/toadz-coston/scripts/upgrade-core-coston2.js`
+- Manual core upgrade script:
+  - `/Users/dantian/toadz-coston/scripts/manual-upgrade-core-coston2.js`
+- Live bytecode verifier:
+  - `/Users/dantian/toadz-coston/scripts/check-live-impl-bytecode-coston2.js`
 - POND/Stake consistency checker:
   - `/Users/dantian/toadz-coston/scripts/check-pond-stake-consistency-coston2.js`
+- Hardhat compile override:
+  - `/Users/dantian/toadz-coston/hardhat.config.js`

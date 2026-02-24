@@ -2,11 +2,6 @@
   "manifestVersion": "3.2",
   "proxies": [
     {
-      "address": "0x410c65DAb32709046B1BA63caBEB4d2824D9E902",
-      "txHash": "0xdf4743129ba3807ccda1c88e93c50db91e9db0e4da846d1cd5411387a52d71b8",
-      "kind": "transparent"
-    },
-    {
       "address": "0xB5cF60df70BDD3E343f7A4be2053140b26273427",
       "txHash": "0x5309caf4230125be0d487454dc0113aed2580c122f363ddc7afeb92e7bb2318a",
       "kind": "transparent"
@@ -17,13 +12,16 @@
       "kind": "transparent"
     },
     {
-      "address": "0xd973E756fCcB640108aAf17B3465a387802A6E49",
-      "txHash": "0xa7ba54ea0bed24ffe1835897943b8cfd91553933253675db11bf95b3e5c9828d",
+      "address": "0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F",
+      "txHash": "0xb17e7d8b1dc43c789e4e4013be85e2ca39c727cc0882fb1a7b7f3636dee2c25c",
       "kind": "transparent"
     },
     {
-      "address": "0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F",
-      "txHash": "0xb17e7d8b1dc43c789e4e4013be85e2ca39c727cc0882fb1a7b7f3636dee2c25c",
+      "address": "0xd973E756fCcB640108aAf17B3465a387802A6E49",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x410c65DAb32709046B1BA63caBEB4d2824D9E902",
       "kind": "transparent"
     }
   ],
@@ -1576,6 +1574,1183 @@
         },
         "namespaces": {}
       }
+    },
+    "1baf098eb9dd5c612b37ea5252c8d956f67f6320dea81c2828065eb4baf7057f": {
+      "address": "0xc447ef54D10b24eDD7b8F0aA669ea6C272A2c444",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:116"
+          },
+          {
+            "label": "LOCK_90_DAYS",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:29"
+          },
+          {
+            "label": "LOCK_180_DAYS",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:30"
+          },
+          {
+            "label": "LOCK_365_DAYS",
+            "offset": 0,
+            "slot": "203",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:31"
+          },
+          {
+            "label": "rewardForEpoch",
+            "offset": 0,
+            "slot": "204",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:33"
+          },
+          {
+            "label": "rewardsManagerAddress",
+            "offset": 0,
+            "slot": "205",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:34"
+          },
+          {
+            "label": "authorizedSender",
+            "offset": 0,
+            "slot": "206",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:35"
+          },
+          {
+            "label": "pond",
+            "offset": 0,
+            "slot": "207",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:37"
+          },
+          {
+            "label": "wflr",
+            "offset": 0,
+            "slot": "208",
+            "type": "t_contract(IERC20)973",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:38"
+          },
+          {
+            "label": "ftsoProvider",
+            "offset": 0,
+            "slot": "209",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:39"
+          },
+          {
+            "label": "boostRegistry",
+            "offset": 0,
+            "slot": "210",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:40"
+          },
+          {
+            "label": "buffer",
+            "offset": 0,
+            "slot": "211",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:41"
+          },
+          {
+            "label": "positions",
+            "offset": 0,
+            "slot": "212",
+            "type": "t_mapping(t_address,t_struct(Position)10504_storage)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:43"
+          },
+          {
+            "label": "rewardIndex",
+            "offset": 0,
+            "slot": "213",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:45"
+          },
+          {
+            "label": "totalWeightedShares",
+            "offset": 0,
+            "slot": "214",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:46"
+          },
+          {
+            "label": "totalEffectiveShares",
+            "offset": 0,
+            "slot": "215",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:47"
+          },
+          {
+            "label": "minDeposit",
+            "offset": 0,
+            "slot": "216",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:49"
+          },
+          {
+            "label": "maxDeposit",
+            "offset": 0,
+            "slot": "217",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:50"
+          },
+          {
+            "label": "poolCap",
+            "offset": 0,
+            "slot": "218",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:51"
+          },
+          {
+            "label": "totalWflrStaked",
+            "offset": 0,
+            "slot": "219",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:52"
+          },
+          {
+            "label": "totalPondStaked",
+            "offset": 0,
+            "slot": "220",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:53"
+          },
+          {
+            "label": "boostsEnabled",
+            "offset": 0,
+            "slot": "221",
+            "type": "t_bool",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:55"
+          },
+          {
+            "label": "referrer",
+            "offset": 0,
+            "slot": "222",
+            "type": "t_mapping(t_address,t_address)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:57"
+          },
+          {
+            "label": "totalRewardsEarned",
+            "offset": 0,
+            "slot": "223",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:60"
+          },
+          {
+            "label": "MPOND_PER_WFLR",
+            "offset": 0,
+            "slot": "224",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:61"
+          },
+          {
+            "label": "totalDeposited",
+            "offset": 0,
+            "slot": "225",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:64"
+          },
+          {
+            "label": "totalFtsoRewardsClaimed",
+            "offset": 0,
+            "slot": "226",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:67"
+          },
+          {
+            "label": "boostMarket",
+            "offset": 0,
+            "slot": "227",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:70"
+          },
+          {
+            "label": "seedBalance",
+            "offset": 0,
+            "slot": "228",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:73"
+          },
+          {
+            "label": "totalPGSDistributed",
+            "offset": 0,
+            "slot": "229",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:76"
+          },
+          {
+            "label": "topStakerReturnBps",
+            "offset": 0,
+            "slot": "230",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:79"
+          },
+          {
+            "label": "zapContract",
+            "offset": 0,
+            "slot": "231",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:82"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)973": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(Position)10504_storage)": {
+            "label": "mapping(address => struct ToadzStake.Position)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Position)10504_storage": {
+            "label": "struct ToadzStake.Position",
+            "members": [
+              {
+                "label": "wflrStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "pondStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "earnedWflr",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "lockExpiry",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "lockMultiplier",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "rewardDebt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "lastUpdateTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      },
+      "allAddresses": [
+        "0xc447ef54D10b24eDD7b8F0aA669ea6C272A2c444"
+      ]
+    },
+    "0b7bbdac371615423b997cdda6e27d144db8ee78022cdcb667f38da69d8e2f96": {
+      "address": "0xBAc7920747c7432629e70a3f0643fb43C8166854",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:116"
+          },
+          {
+            "label": "DRIP_DURATION_FIXED",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_uint256",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:17"
+          },
+          {
+            "label": "DRIP_DURATION_MIN",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_uint256",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:18"
+          },
+          {
+            "label": "DRIP_DURATION_MAX",
+            "offset": 0,
+            "slot": "203",
+            "type": "t_uint256",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:19"
+          },
+          {
+            "label": "name",
+            "offset": 0,
+            "slot": "204",
+            "type": "t_string_storage",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:21"
+          },
+          {
+            "label": "symbol",
+            "offset": 0,
+            "slot": "205",
+            "type": "t_string_storage",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:22"
+          },
+          {
+            "label": "totalSupply",
+            "offset": 0,
+            "slot": "206",
+            "type": "t_uint256",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:23"
+          },
+          {
+            "label": "balanceOf",
+            "offset": 0,
+            "slot": "207",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:25"
+          },
+          {
+            "label": "stakedPond",
+            "offset": 0,
+            "slot": "208",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:26"
+          },
+          {
+            "label": "totalPondCost",
+            "offset": 0,
+            "slot": "209",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:27"
+          },
+          {
+            "label": "totalPondBought",
+            "offset": 0,
+            "slot": "210",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:28"
+          },
+          {
+            "label": "redemptions",
+            "offset": 0,
+            "slot": "211",
+            "type": "t_mapping(t_address,t_struct(RedemptionInfo)15574_storage)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:36"
+          },
+          {
+            "label": "wasStaked",
+            "offset": 0,
+            "slot": "212",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:38"
+          },
+          {
+            "label": "toadzStake",
+            "offset": 0,
+            "slot": "213",
+            "type": "t_address",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:40"
+          },
+          {
+            "label": "buffer",
+            "offset": 0,
+            "slot": "214",
+            "type": "t_address",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:41"
+          },
+          {
+            "label": "wflr",
+            "offset": 0,
+            "slot": "215",
+            "type": "t_contract(IERC20)3750",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:42"
+          },
+          {
+            "label": "minPurchase",
+            "offset": 0,
+            "slot": "216",
+            "type": "t_uint256",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:44"
+          },
+          {
+            "label": "purchasesEnabled",
+            "offset": 0,
+            "slot": "217",
+            "type": "t_bool",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:45"
+          },
+          {
+            "label": "isAuthorizedMinter",
+            "offset": 0,
+            "slot": "218",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:47"
+          },
+          {
+            "label": "zapContract",
+            "offset": 0,
+            "slot": "219",
+            "type": "t_address",
+            "contract": "POND",
+            "src": "contracts/POND_V2.sol:50"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)3750": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(RedemptionInfo)15574_storage)": {
+            "label": "mapping(address => struct POND.RedemptionInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RedemptionInfo)15574_storage": {
+            "label": "struct POND.RedemptionInfo",
+            "members": [
+              {
+                "label": "totalOwed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "dripEndTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "dripStartTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      },
+      "allAddresses": [
+        "0xBAc7920747c7432629e70a3f0643fb43C8166854",
+        "0xf5B48D5bf5E6e657430c1e57e3667e0a74Aa433c"
+      ]
+    },
+    "0b0b536349c833a15423cc67e0c3e7ceaf14ea125c6d728aa9a706f74a3e7cbf": {
+      "address": "0xc447ef54D10b24eDD7b8F0aA669ea6C272A2c444",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:116"
+          },
+          {
+            "label": "LOCK_90_DAYS",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:29"
+          },
+          {
+            "label": "LOCK_180_DAYS",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:30"
+          },
+          {
+            "label": "LOCK_365_DAYS",
+            "offset": 0,
+            "slot": "203",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:31"
+          },
+          {
+            "label": "rewardForEpoch",
+            "offset": 0,
+            "slot": "204",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:33"
+          },
+          {
+            "label": "rewardsManagerAddress",
+            "offset": 0,
+            "slot": "205",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:34"
+          },
+          {
+            "label": "authorizedSender",
+            "offset": 0,
+            "slot": "206",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:35"
+          },
+          {
+            "label": "pond",
+            "offset": 0,
+            "slot": "207",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:37"
+          },
+          {
+            "label": "wflr",
+            "offset": 0,
+            "slot": "208",
+            "type": "t_contract(IERC20)973",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:38"
+          },
+          {
+            "label": "ftsoProvider",
+            "offset": 0,
+            "slot": "209",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:39"
+          },
+          {
+            "label": "boostRegistry",
+            "offset": 0,
+            "slot": "210",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:40"
+          },
+          {
+            "label": "buffer",
+            "offset": 0,
+            "slot": "211",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:41"
+          },
+          {
+            "label": "positions",
+            "offset": 0,
+            "slot": "212",
+            "type": "t_mapping(t_address,t_struct(Position)8665_storage)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:43"
+          },
+          {
+            "label": "rewardIndex",
+            "offset": 0,
+            "slot": "213",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:45"
+          },
+          {
+            "label": "totalWeightedShares",
+            "offset": 0,
+            "slot": "214",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:46"
+          },
+          {
+            "label": "totalEffectiveShares",
+            "offset": 0,
+            "slot": "215",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:47"
+          },
+          {
+            "label": "minDeposit",
+            "offset": 0,
+            "slot": "216",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:49"
+          },
+          {
+            "label": "maxDeposit",
+            "offset": 0,
+            "slot": "217",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:50"
+          },
+          {
+            "label": "poolCap",
+            "offset": 0,
+            "slot": "218",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:51"
+          },
+          {
+            "label": "totalWflrStaked",
+            "offset": 0,
+            "slot": "219",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:52"
+          },
+          {
+            "label": "totalPondStaked",
+            "offset": 0,
+            "slot": "220",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:53"
+          },
+          {
+            "label": "boostsEnabled",
+            "offset": 0,
+            "slot": "221",
+            "type": "t_bool",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:55"
+          },
+          {
+            "label": "referrer",
+            "offset": 0,
+            "slot": "222",
+            "type": "t_mapping(t_address,t_address)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:57"
+          },
+          {
+            "label": "totalRewardsEarned",
+            "offset": 0,
+            "slot": "223",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:60"
+          },
+          {
+            "label": "MPOND_PER_WFLR",
+            "offset": 0,
+            "slot": "224",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:61"
+          },
+          {
+            "label": "totalDeposited",
+            "offset": 0,
+            "slot": "225",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:64"
+          },
+          {
+            "label": "totalFtsoRewardsClaimed",
+            "offset": 0,
+            "slot": "226",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:67"
+          },
+          {
+            "label": "boostMarket",
+            "offset": 0,
+            "slot": "227",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:70"
+          },
+          {
+            "label": "seedBalance",
+            "offset": 0,
+            "slot": "228",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:73"
+          },
+          {
+            "label": "totalPGSDistributed",
+            "offset": 0,
+            "slot": "229",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:76"
+          },
+          {
+            "label": "topStakerReturnBps",
+            "offset": 0,
+            "slot": "230",
+            "type": "t_uint256",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:79"
+          },
+          {
+            "label": "zapContract",
+            "offset": 0,
+            "slot": "231",
+            "type": "t_address",
+            "contract": "ToadzStake",
+            "src": "contracts/ToadzStakeV5.sol:82"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IERC20)973": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(Position)8665_storage)": {
+            "label": "mapping(address => struct ToadzStake.Position)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Position)8665_storage": {
+            "label": "struct ToadzStake.Position",
+            "members": [
+              {
+                "label": "wflrStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "pondStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "earnedWflr",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "lockExpiry",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "lockMultiplier",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "rewardDebt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "lastUpdateTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      },
+      "allAddresses": [
+        "0xc447ef54D10b24eDD7b8F0aA669ea6C272A2c444",
+        "0xCFFFef784711F89962e78553fD69551877AAB734"
+      ]
     }
   }
 }
