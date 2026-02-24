@@ -124,6 +124,8 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `npx hardhat run scripts/manual-upgrade-core-coston2.js --network coston2`
 - Verify live implementation bytecode matches local:
   - `npx hardhat run scripts/check-live-impl-bytecode-coston2.js --network coston2`
+- Validate live patched behavior checks:
+  - `npx hardhat run scripts/validate-live-security-fixes-coston2.js --network coston2`
 - Pre-upgrade consistency check (Coston2):
   - `npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (default scans recent window)
   - `FROM_BLOCK=1 npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (full-history; slower on Coston2 RPC)
@@ -148,6 +150,8 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `/Users/dantian/toadz-coston/scripts/manual-upgrade-core-coston2.js`
 - Live bytecode verifier:
   - `/Users/dantian/toadz-coston/scripts/check-live-impl-bytecode-coston2.js`
+- Live behavior validator:
+  - `/Users/dantian/toadz-coston/scripts/validate-live-security-fixes-coston2.js`
 - POND/Stake consistency checker:
   - `/Users/dantian/toadz-coston/scripts/check-pond-stake-consistency-coston2.js`
 - Hardhat compile override:
