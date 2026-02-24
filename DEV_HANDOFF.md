@@ -20,6 +20,9 @@ Last updated: 2026-02-24
 
 Reference file: `/Users/dantian/toadz-coston/site/src/contracts.js`
 
+### Current key params (Coston2)
+- `ToadzStake.poolCap`: `50,000 FLR` (set on 2026-02-24)
+
 ### Current implementations (post-upgrade, 2026-02-24)
 - `ToadzStake` implementation: `0x45f92298e5CC08Fb3f61A8751070B74A9FCE950b`
 - `POND` implementation: `0x09FbeF230E81B608A127C50D2D81B49535B23Cd9`
@@ -126,6 +129,8 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `npx hardhat run scripts/check-live-impl-bytecode-coston2.js --network coston2`
 - Validate live patched behavior checks:
   - `npx hardhat run scripts/validate-live-security-fixes-coston2.js --network coston2`
+- Set pool cap (any network configured in Hardhat):
+  - `POOL_CAP_FLR=50000 STAKE_PROXY=<stake_proxy> npx hardhat run scripts/set-pool-cap.js --network <network>`
 - Pre-upgrade consistency check (Coston2):
   - `npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (default scans recent window)
   - `FROM_BLOCK=1 npx hardhat run scripts/check-pond-stake-consistency-coston2.js --network coston2` (full-history; slower on Coston2 RPC)
@@ -152,7 +157,15 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `/Users/dantian/toadz-coston/scripts/check-live-impl-bytecode-coston2.js`
 - Live behavior validator:
   - `/Users/dantian/toadz-coston/scripts/validate-live-security-fixes-coston2.js`
+- Pool cap setter:
+  - `/Users/dantian/toadz-coston/scripts/set-pool-cap.js`
 - POND/Stake consistency checker:
   - `/Users/dantian/toadz-coston/scripts/check-pond-stake-consistency-coston2.js`
 - Hardhat compile override:
   - `/Users/dantian/toadz-coston/hardhat.config.js`
+
+## 10) Mainnet Carry-Over Guardrail
+- Before opening deposits on mainnet, run:
+  - `POOL_CAP_FLR=50000 STAKE_PROXY=<mainnet_stake_proxy> npx hardhat run scripts/set-pool-cap.js --network <mainnet_network>`
+- Post-check:
+  - call `poolCap()` and verify `50000.0` FLR.
