@@ -1,6 +1,6 @@
 # Toadz Coston2 Dev Handoff
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
 ## 1) Environment
 - Frontend: Vite app in `/Users/dantian/toadz-coston/site`
@@ -29,6 +29,13 @@ Reference file: `/Users/dantian/toadz-coston/site/src/contracts.js`
 - `ToadzStake` ProxyAdmin: `0xb0b19248D39c76cFC0a2D971FF41A3C24508688F`
 - `POND` ProxyAdmin: `0x6DF6a2983bC18F84823b9bC9037c80De3e5a0d83`
 
+### Flare mainnet status (post-upgrade, 2026-02-25)
+- `ToadzStake` proxy: `0xef3722efB994bb7657616763ffD7e70f5E1b2999`
+- `POND` proxy: `0x9c71462248801D430A7d06de502D2324abCE517E`
+- `ToadzStake` implementation: `0x3968e3f443D8724FDEd306601C3c1745A563bc90`
+- `POND` implementation: `0x30523c206F6e19A11FC9CE76473ff745B0C6ccEf`
+- `ToadzStake.poolCap`: `50,000 FLR`
+
 ## 3) Core Mechanics (Current)
 - Native token is `C2FLR` (gas token), but staking system runs on `WFLR` (ERC20).
 - New stake (no active position): routed via `ZapDeposit.zapDeposit(...)` for one transaction.
@@ -51,7 +58,7 @@ Reference file: `/Users/dantian/toadz-coston/site/src/contracts.js`
 
 Contract file: `/Users/dantian/toadz-coston/contracts/ToadzStakeV5.sol`
 
-## 3.1) Security Patch Set (Source Updated, Upgrade Pending)
+## 3.1) Security Patch Set (Live)
 - `POND.burn` / `burnForMint` now prevent non-stake callers from burning staked POND and require exact staked accounting for stake-origin burns.
 - `ToadzStake.addToStake` now enforces per-user `maxDeposit` across cumulative deposits (`totalDeposited + add <= maxDeposit`).
 - `ToadzStake.emergencyWithdraw` now requires no active stake accounting (`totalWflrStaked`, `totalWeightedShares`, `totalEffectiveShares` must be zero).
@@ -129,6 +136,12 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `npx hardhat run scripts/check-live-impl-bytecode-coston2.js --network coston2`
 - Validate live patched behavior checks:
   - `npx hardhat run scripts/validate-live-security-fixes-coston2.js --network coston2`
+- Manual validated upgrade on Flare mainnet:
+  - `npx hardhat run scripts/manual-upgrade-core-flare.js --network flare`
+- Verify live implementation bytecode on Flare mainnet:
+  - `npx hardhat run scripts/check-live-impl-bytecode-flare.js --network flare`
+- Validate live patched behavior checks on Flare mainnet:
+  - `npx hardhat run scripts/validate-live-security-fixes-flare.js --network flare`
 - Set pool cap (any network configured in Hardhat):
   - `POOL_CAP_FLR=50000 STAKE_PROXY=<stake_proxy> npx hardhat run scripts/set-pool-cap.js --network <network>`
 - Pre-upgrade consistency check (Coston2):
@@ -153,10 +166,16 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - `/Users/dantian/toadz-coston/scripts/upgrade-core-coston2.js`
 - Manual core upgrade script:
   - `/Users/dantian/toadz-coston/scripts/manual-upgrade-core-coston2.js`
+- Manual core upgrade script (Flare mainnet):
+  - `/Users/dantian/toadz-coston/scripts/manual-upgrade-core-flare.js`
 - Live bytecode verifier:
   - `/Users/dantian/toadz-coston/scripts/check-live-impl-bytecode-coston2.js`
+- Live bytecode verifier (Flare mainnet):
+  - `/Users/dantian/toadz-coston/scripts/check-live-impl-bytecode-flare.js`
 - Live behavior validator:
   - `/Users/dantian/toadz-coston/scripts/validate-live-security-fixes-coston2.js`
+- Live behavior validator (Flare mainnet):
+  - `/Users/dantian/toadz-coston/scripts/validate-live-security-fixes-flare.js`
 - Pool cap setter:
   - `/Users/dantian/toadz-coston/scripts/set-pool-cap.js`
 - POND/Stake consistency checker:

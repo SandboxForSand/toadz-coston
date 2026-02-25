@@ -3270,7 +3270,7 @@
             "label": "redemptions",
             "offset": 0,
             "slot": "211",
-            "type": "t_mapping(t_address,t_struct(RedemptionInfo)1037_storage)",
+            "type": "t_mapping(t_address,t_struct(RedemptionInfo)15574_storage)",
             "contract": "POND",
             "src": "contracts/POND_V2.sol:36"
           },
@@ -3302,7 +3302,7 @@
             "label": "wflr",
             "offset": 0,
             "slot": "215",
-            "type": "t_contract(IERC20)973",
+            "type": "t_contract(IERC20)3750",
             "contract": "POND",
             "src": "contracts/POND_V2.sol:42"
           },
@@ -3356,7 +3356,7 @@
             "label": "bool",
             "numberOfBytes": "1"
           },
-          "t_contract(IERC20)973": {
+          "t_contract(IERC20)3750": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
@@ -3364,7 +3364,7 @@
             "label": "mapping(address => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_struct(RedemptionInfo)1037_storage)": {
+          "t_mapping(t_address,t_struct(RedemptionInfo)15574_storage)": {
             "label": "mapping(address => struct POND.RedemptionInfo)",
             "numberOfBytes": "32"
           },
@@ -3376,7 +3376,7 @@
             "label": "string",
             "numberOfBytes": "32"
           },
-          "t_struct(RedemptionInfo)1037_storage": {
+          "t_struct(RedemptionInfo)15574_storage": {
             "label": "struct POND.RedemptionInfo",
             "members": [
               {

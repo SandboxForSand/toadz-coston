@@ -35,6 +35,11 @@ module.exports = {
       chainId: 19,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
+    flare: {
+      url: "https://flare-api.flare.network/ext/C/rpc",
+      chainId: 14,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+    },
 
     coston2: {
       url: "https://coston2-api.flare.network/ext/C/rpc",
@@ -44,9 +49,18 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
+      flare: "flare",
       coston2: "coston2"
     },
     customChains: [
+      {
+        network: "flare",
+        chainId: 14,
+        urls: {
+          apiURL: "https://flare-explorer.flare.network/api",
+          browserURL: "https://flare-explorer.flare.network"
+        }
+      },
       {
         network: "coston2",
         chainId: 114,
