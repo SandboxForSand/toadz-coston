@@ -1296,8 +1296,6 @@ useEffect(() => {
       const currentlyStakedPond = await pond.stakedPond(address);
       const unstakedPond = totalPondBalance > currentlyStakedPond ? totalPondBalance - currentlyStakedPond : 0n;
 
-      const currentWflrStaked = position[0];
-      const currentPondStaked = position[1];
       const evaluateStakePlan = async (candidateStakeAmount) => {
         if (candidateStakeAmount <= 0n) {
           return {
@@ -1308,12 +1306,8 @@ useEffect(() => {
           };
         }
 
-        const targetPondForStake = hasActivePosition
-          ? await toadzStake.getPondRequired(currentWflrStaked + candidateStakeAmount)
-          : await toadzStake.getPondRequired(candidateStakeAmount);
-        const additionalPondNeeded = hasActivePosition
-          ? (targetPondForStake > currentPondStaked ? targetPondForStake - currentPondStaked : 0n)
-          : targetPondForStake;
+        // Match on-chain addToStake policy: POND is based on this add amount only.
+        const additionalPondNeeded = await toadzStake.getPondRequired(candidateStakeAmount);
         const pondToBuy = additionalPondNeeded > unstakedPond ? additionalPondNeeded - unstakedPond : 0n;
 
         let wflrForPond = 0n;

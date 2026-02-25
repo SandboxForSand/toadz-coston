@@ -560,8 +560,8 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
 
         require(wflr.transferFrom(msg.sender, address(this), wflrAmount), "WFLR transfer failed");
 
-        uint256 newTotalPond = getPondRequired(pos.wflrStaked + wflrAmount);
-        uint256 additionalPond = newTotalPond - pos.pondStaked;
+        // Per-add model: only require POND for this incremental deposit amount.
+        uint256 additionalPond = getPondRequired(wflrAmount);
 
         if (additionalPond > 0) {
             require(IPOND(pond).balanceOf(msg.sender) >= additionalPond, "Insufficient POND");
