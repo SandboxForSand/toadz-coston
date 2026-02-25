@@ -1791,6 +1791,19 @@ useEffect(() => {
     pondStaked: userPosition?.pondStaked || 0,
     totalDeposited: userPosition?.totalDeposited || 0,
   };
+
+  const positionTimeRemaining = (() => {
+    if (!user.lockEnd) return null;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const secondsRemaining = Math.max(0, user.lockEnd - nowSec);
+    if (secondsRemaining === 0) return 'Expired';
+    if (secondsRemaining < 86400) {
+      const hours = Math.max(1, Math.ceil(secondsRemaining / 3600));
+      return `${hours} hour${hours === 1 ? '' : 's'}`;
+    }
+    const days = Math.max(1, Math.ceil(secondsRemaining / 86400));
+    return `${days} day${days === 1 ? '' : 's'}`;
+  })();
   
   // Pool info - real contract data only
   const poolInfo = {
@@ -5865,6 +5878,11 @@ useEffect(() => {
             <div>
               <div>FLR Position <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(user.totalPosition)} FLR</span></div>
               <div style={{ marginTop: 4 }}>POND Position <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(user.pondStaked)} POND</span></div>
+              {positionTimeRemaining && (
+                <div style={{ marginTop: 4 }}>
+                  Time remaining <span style={{ color: '#fff', fontWeight: 600 }}>{positionTimeRemaining}</span>
+                </div>
+              )}
             </div>
             <div style={{ textAlign: 'right' }}>Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span></div>
           </div>
