@@ -175,7 +175,7 @@ const ToadzFinal = () => {
   }, [userName]);
 
   const isDesktop = windowWidth >= 768;
-  const inflowCacheKey = `toadz_inflow_history_v3_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}`;
+  const inflowCacheKey = `toadz_inflow_history_v4_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}`;
   const INFLOW_CHUNK_SIZE = 30;
   const INFLOW_LOOKBACK_BLOCKS = 360;
   const INFLOW_MAX_ITEMS = 12;
@@ -1978,7 +1978,7 @@ useEffect(() => {
     const lockDaysLeft = userPosition?.lockExpiry 
       ? Math.max(0, Math.ceil((userPosition.lockExpiry * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
       : 0;
-    const lockTier = userPosition?.lockMultiplier === 4 ? '365d' : userPosition?.lockMultiplier === 2 ? '180d' : '90d';
+    const lockTier = userPosition?.lockMultiplier === 4 ? '7d' : userPosition?.lockMultiplier === 2 ? '2d' : '1d';
     
     return (
     <div 
@@ -6344,9 +6344,9 @@ useEffect(() => {
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', gap: 6 }}>
               {[
-                { tier: 0, days: '90d', mult: '1x' },
-                { tier: 1, days: '180d', mult: '2x' },
-                { tier: 2, days: '365d', mult: '4x' }
+                { tier: 0, days: '1d', mult: '1x' },
+                { tier: 1, days: '2d', mult: '2x' },
+                { tier: 2, days: '7d', mult: '4x' }
               ].map(({ tier, days, mult }) => (
                 <button
                   key={tier}
@@ -6389,7 +6389,7 @@ useEffect(() => {
             {/* Lock bonus text */}
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                {lockTier === 0 ? '90d' : lockTier === 1 ? '180d' : '365d'} → <span style={{ color: '#00ff88', fontWeight: 600 }}>{lockTier === 0 ? '1x' : lockTier === 1 ? '2x' : '4x'} rewards</span>
+                {lockTier === 0 ? '1d' : lockTier === 1 ? '2d' : '7d'} → <span style={{ color: '#00ff88', fontWeight: 600 }}>{lockTier === 0 ? '1x' : lockTier === 1 ? '2x' : '4x'} rewards</span>
               </span>
             </div>
           </div>
@@ -8492,9 +8492,9 @@ useEffect(() => {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>SELECT LOCK PERIOD</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {[
-                  { tier: 0, days: '90d', mult: '1x' },
-                  { tier: 1, days: '180d', mult: '2x' },
-                  { tier: 2, days: '365d', mult: '4x' }
+                  { tier: 0, days: '1d', mult: '1x' },
+                  { tier: 1, days: '2d', mult: '2x' },
+                  { tier: 2, days: '7d', mult: '4x' }
                 ].map(({ tier, days, mult }) => (
                   <button
                     key={tier}
