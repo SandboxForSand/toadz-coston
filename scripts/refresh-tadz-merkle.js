@@ -26,22 +26,30 @@ function makeLeaf(address, allocation) {
 
 async function main() {
   const chain = network.name;
-  const defaults = NETWORK_DEFAULTS[chain] || {};
+  const stackPath = process.env.STACK_JSON || path.join(process.cwd(), "scripts", "tadz-automation-coston2.json");
+  let stack = null;
+  if (fs.existsSync(stackPath)) {
+    try {
+      stack = JSON.parse(fs.readFileSync(stackPath, "utf8"));
+    } catch (e) {
+      stack = null;
+    }
+  }
 
-  const ogVaultAddress = process.env.OGVAULT_ADDRESS;
-  const claimerAddress = process.env.CLAIMER_ADDRESS;
-  const ogRpcUrl = process.env.OG_RPC_URL || defaults.ogRpcUrl;
+  const ogVaultAddress = process.env.OGVAULT_ADDRESS || stack?.ogVault;
+  const claimerAddress = process.env.CLAIMER_ADDRESS || stack?.claimer;
+  const forceSameProvider = envBool("FORCE_SAME_PROVIDER", false);
+  const ogRpcUrl = forceSameProvider ? "" : (process.env.OG_RPC_URL || "");
   const writePath = process.env.MERKLE_JSON_PATH || "merkle-tree.json";
   const autoSetRoot = envBool("AUTO_SET_ROOT", true);
   const dryRun = envBool("DRY_RUN", false);
 
   if (!ogVaultAddress) throw new Error("Missing OGVAULT_ADDRESS env");
   if (!claimerAddress) throw new Error("Missing CLAIMER_ADDRESS env");
-  if (!ogRpcUrl) throw new Error("Missing OG_RPC_URL env");
 
   const signer = (await ethers.getSigners())[0];
   const updateProvider = signer.provider;
-  const ogProvider = new ethers.JsonRpcProvider(ogRpcUrl);
+  const ogProvider = ogRpcUrl ? new ethers.JsonRpcProvider(ogRpcUrl) : updateProvider;
 
   const ogVault = new ethers.Contract(
     ogVaultAddress,
@@ -61,7 +69,7 @@ async function main() {
   console.log("Network:", chain);
   console.log("Signer:", signer.address);
   console.log("Update RPC chainId:", (await updateProvider.getNetwork()).chainId.toString());
-  console.log("OG source RPC:", ogRpcUrl);
+  console.log("OG source RPC:", ogRpcUrl || "same as update provider");
   console.log("OGVault:", ogVaultAddress);
   console.log("Claimer:", claimerAddress);
   console.log("Auto-set root:", autoSetRoot && !dryRun);
