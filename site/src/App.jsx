@@ -19,7 +19,6 @@ const BOOST_COLLECTIONS = [
 
 // Platform wallets get 10 free listings
 const PLATFORM_WALLETS = [
-  '0x9bDB29529016a15754373B9D5B5116AB728E916e',
   '0x6D69E5d3E51ef1eE47d3C73112aa74F6eA944895',
   '0xcf64CA3A422054DEb35C829a3fc79E03955daf4B'
 ].map(a => a.toLowerCase());
