@@ -268,6 +268,23 @@ const ToadzFinal = () => {
       // Non-enumerable NFT collections fall back to Transfer log reconstruction.
     }
 
+    // Test OG collection fallback: tokens are sequentially minted and small supply.
+    if (
+      CONTRACTS.TestOGCollection &&
+      String(collectionAddress).toLowerCase() === String(CONTRACTS.TestOGCollection).toLowerCase()
+    ) {
+      const owned = [];
+      for (let tokenId = 1; tokenId <= 200; tokenId++) {
+        try {
+          const owner = await nft.ownerOf(tokenId);
+          if (String(owner).toLowerCase() === normalizedUser) owned.push(tokenId);
+        } catch (_) {
+          // Skip non-existent token IDs.
+        }
+      }
+      if (owned.length > 0) return owned;
+    }
+
     try {
       const transferTopic = ethers.id('Transfer(address,address,uint256)');
       const userTopic = ethers.zeroPadValue(userAddress, 32);
