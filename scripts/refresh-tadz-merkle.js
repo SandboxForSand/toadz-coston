@@ -41,6 +41,7 @@ async function main() {
   const forceSameProvider = envBool("FORCE_SAME_PROVIDER", false);
   const ogRpcUrl = forceSameProvider ? "" : (process.env.OG_RPC_URL || "");
   const writePath = process.env.MERKLE_JSON_PATH || "merkle-tree.json";
+  const siteWritePath = process.env.SITE_MERKLE_JSON_PATH || path.join("site", "public", "merkle-tree.json");
   const autoSetRoot = envBool("AUTO_SET_ROOT", true);
   const dryRun = envBool("DRY_RUN", false);
 
@@ -119,6 +120,13 @@ async function main() {
   const outAbs = path.isAbsolute(writePath) ? writePath : path.join(process.cwd(), writePath);
   fs.writeFileSync(outAbs, JSON.stringify(output, null, 2));
   console.log("Wrote snapshot:", outAbs);
+
+  const siteAbs = path.isAbsolute(siteWritePath) ? siteWritePath : path.join(process.cwd(), siteWritePath);
+  if (siteAbs !== outAbs) {
+    fs.mkdirSync(path.dirname(siteAbs), { recursive: true });
+    fs.writeFileSync(siteAbs, JSON.stringify(output, null, 2));
+    console.log("Wrote frontend snapshot:", siteAbs);
+  }
 
   const currentRoot = await claimer.merkleRoot();
   console.log("Current root:", currentRoot);

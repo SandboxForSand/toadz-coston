@@ -3,19 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACTS, COSTON2_CHAIN, ABIS, LOCK_TIERS, OG_COLLECTIONS } from './contracts.js';
-const merkleTreeData = { proofs: {}, root: '0x' + '0'.repeat(64) }; // Placeholder for testnet
 
-// TadzClaimer on Flare
-const TADZ_CLAIMER = {
-  address: '0x08e687aC00311F4683eBEbEc0d234193EA9AD319',
-  abi: [
-    'function claim(uint256 totalAllocation, bytes32[] calldata proof) external',
-    'function claimed(address) view returns (uint256)',
-    'function getClaimable(address user, uint256 totalAllocation, bytes32[] calldata proof) view returns (uint256)',
-    'function availableTokens() view returns (uint256)',
-    'function verifyProof(address user, uint256 totalAllocation, bytes32[] calldata proof) view returns (bool)'
-  ]
-};
+const EMPTY_MERKLE_TREE = Object.freeze({
+  proofs: {},
+  merkleRoot: `0x${'0'.repeat(64)}`
+});
 
 // Boost-eligible collections (Flare only for now)
 const BOOST_COLLECTIONS = [
@@ -220,6 +212,7 @@ const ToadzFinal = () => {
   const inflowSyncInFlightRef = useRef(false);
   const userDataInFlightRef = useRef(false);
   const readProviderRef = useRef(null);
+  const merkleCacheRef = useRef({ fetchedAt: 0, data: EMPTY_MERKLE_TREE });
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
 
@@ -232,6 +225,90 @@ const ToadzFinal = () => {
 
   const getReadableError = (err) => {
     return err?.reason || err?.shortMessage || err?.data?.message || err?.message || 'Unknown error';
+  };
+
+  const loadMerkleTreeSnapshot = async (force = false) => {
+    const now = Date.now();
+    if (!force && now - merkleCacheRef.current.fetchedAt < 15000) {
+      return merkleCacheRef.current.data;
+    }
+
+    try {
+      const url = `${import.meta.env.BASE_URL}merkle-tree.json?ts=${Math.floor(now / 15000)}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Merkle fetch failed: ${res.status}`);
+      const json = await res.json();
+      const parsed = {
+        proofs: json?.proofs || {},
+        merkleRoot: json?.merkleRoot || `0x${'0'.repeat(64)}`
+      };
+      merkleCacheRef.current = { fetchedAt: now, data: parsed };
+      return parsed;
+    } catch (err) {
+      console.log('Merkle snapshot unavailable:', err?.message || err);
+      return merkleCacheRef.current.data;
+    }
+  };
+
+  const getOwnedTokenIds = async (collectionAddress, userAddress, readProvider) => {
+    const nft = new ethers.Contract(collectionAddress, ABIS.ERC721, readProvider);
+    const normalizedUser = userAddress.toLowerCase();
+
+    try {
+      const balance = Number(await nft.balanceOf(userAddress));
+      if (balance === 0) return [];
+
+      const tokenIds = [];
+      for (let i = 0; i < balance; i++) {
+        const tokenId = await nft.tokenOfOwnerByIndex(userAddress, i);
+        tokenIds.push(Number(tokenId));
+      }
+      return tokenIds;
+    } catch (_) {
+      // Non-enumerable NFT collections fall back to Transfer log reconstruction.
+    }
+
+    try {
+      const transferTopic = ethers.id('Transfer(address,address,uint256)');
+      const userTopic = ethers.zeroPadValue(userAddress, 32);
+
+      const [incomingLogs, outgoingLogs] = await Promise.all([
+        readProvider.getLogs({
+          address: collectionAddress,
+          fromBlock: 0,
+          toBlock: 'latest',
+          topics: [transferTopic, null, userTopic]
+        }),
+        readProvider.getLogs({
+          address: collectionAddress,
+          fromBlock: 0,
+          toBlock: 'latest',
+          topics: [transferTopic, userTopic, null]
+        })
+      ]);
+
+      const iface = new ethers.Interface(['event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)']);
+      const logs = [...incomingLogs, ...outgoingLogs].sort((a, b) => {
+        if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber;
+        return (a.index ?? 0) - (b.index ?? 0);
+      });
+
+      const owned = new Set();
+      for (const log of logs) {
+        const parsed = iface.parseLog(log);
+        const tokenId = Number(parsed.args.tokenId);
+        const from = String(parsed.args.from).toLowerCase();
+        const to = String(parsed.args.to).toLowerCase();
+
+        if (to === normalizedUser) owned.add(tokenId);
+        if (from === normalizedUser) owned.delete(tokenId);
+      }
+
+      return [...owned].sort((a, b) => a - b);
+    } catch (err) {
+      console.log(`Owned token lookup failed for ${collectionAddress}:`, err?.message || err);
+      return [];
+    }
   };
 
   // Marketplace state
@@ -725,12 +802,14 @@ const syncToFlare = async () => {
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
       const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
       const boostRegistry = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.BoostRegistry, web3Signer);
+      const ogVault = CONTRACTS.OGVault ? new ethers.Contract(CONTRACTS.OGVault, ABIS.OGVault, web3Signer) : null;
+      const tadzClaimer = CONTRACTS.TadzClaimer ? new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, web3Signer) : null;
       const toadzMint = CONTRACTS.ToadzMint ? new ethers.Contract(CONTRACTS.ToadzMint, ABIS.ToadzMint, web3Signer) : null;
 
-      setContracts({ toadzStake, pond, wflr, boostRegistry, toadzMint });
+      setContracts({ toadzStake, pond, wflr, boostRegistry, ogVault, tadzClaimer, toadzMint });
 
       // Load user data
-      await loadUserData(address, { toadzStake, pond, wflr, boostRegistry, toadzMint });
+      await loadUserData(address, { toadzStake, pond, wflr, boostRegistry, ogVault, tadzClaimer, toadzMint });
       
     } catch (err) {
       console.error('Wallet connection failed:', err);
@@ -834,11 +913,101 @@ const syncToFlare = async () => {
       
       // Mint not available on Coston2
       setMintData({ isLive: false, totalMinted: 0, maxSupply: 0, credits: 0 });
-      
-      // OG NFT data / OGVault / TadzClaimer — not available on Coston2 testnet
-      setOgNftData({ collections: [], totalOwned: 0, totalLocked: 0 });
-      setTadzClaimData({ allocation: 0, claimed: 0, claimable: 0, proof: [], loading: false });
-      setAllLockers([]);
+
+      // OG Vault state + Tadz claim data
+      if (CONTRACTS.OGVault) {
+        const ogVaultRead = new ethers.Contract(CONTRACTS.OGVault, ABIS.OGVault, readProvider);
+        const [eligibleCollections, merkleSnapshot, lockersResult] = await Promise.all([
+          ogVaultRead.getEligibleCollections().catch(() => OG_COLLECTIONS.map((c) => c.address)),
+          loadMerkleTreeSnapshot(),
+          ogVaultRead.getAllLockers().catch(() => [[], [], 0n])
+        ]);
+
+        const normalizedAddress = address.toLowerCase();
+        const proofEntry = merkleSnapshot?.proofs?.[normalizedAddress] || null;
+        const defaultAllocation = Number(proofEntry?.tadzAllocation || 0);
+        const defaultProof = proofEntry?.proof || [];
+
+        const collectionRows = await Promise.all(
+          eligibleCollections.map(async (collectionAddress) => {
+            const meta = OG_COLLECTIONS.find(
+              (c) => c.address.toLowerCase() === String(collectionAddress).toLowerCase()
+            );
+            const [lockedRaw, ownedTokenIds] = await Promise.all([
+              ogVaultRead.getLockedNfts(address, collectionAddress).catch(() => []),
+              getOwnedTokenIds(collectionAddress, address, readProvider)
+            ]);
+
+            const lockedTokenIds = lockedRaw.map((id) => Number(id));
+            const lockedSet = new Set(lockedTokenIds);
+            const availableTokenIds = ownedTokenIds.filter((id) => !lockedSet.has(id));
+
+            return {
+              address: collectionAddress,
+              name: meta?.name || `Collection ${String(collectionAddress).slice(0, 6)}...`,
+              emoji: meta?.emoji || '🧪',
+              owned: ownedTokenIds.length,
+              locked: lockedTokenIds.length,
+              ownedTokenIds,
+              lockedTokenIds,
+              availableTokenIds
+            };
+          })
+        );
+
+        const totalOwned = collectionRows.reduce((sum, row) => sum + row.owned, 0);
+        const totalLocked = collectionRows.reduce((sum, row) => sum + row.locked, 0);
+        setOgNftData({ collections: collectionRows, totalOwned, totalLocked });
+
+        const [lockerAddresses, lockerCounts] = lockersResult;
+        const socialRows = (lockerAddresses || [])
+          .map((lockerAddress, i) => ({
+            address: lockerAddress,
+            count: Number(lockerCounts?.[i] || 0)
+          }))
+          .filter((row) => row.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setAllLockers(socialRows);
+
+        if (CONTRACTS.TadzClaimer) {
+          const tadzClaimerRead = new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, readProvider);
+          const [claimedRaw, autoAllocationRaw] = await Promise.all([
+            tadzClaimerRead.claimed(address).catch(() => 0n),
+            tadzClaimerRead.getAutoAllocation(address).catch(() => 0n)
+          ]);
+
+          const autoAllocation = Number(autoAllocationRaw);
+          const allocation = autoAllocation > 0 ? autoAllocation : defaultAllocation;
+          const proof = autoAllocation > 0 ? [] : defaultProof;
+
+          let claimableRaw = 0n;
+          if (allocation > 0 || proof.length > 0) {
+            claimableRaw = await tadzClaimerRead
+              .getClaimable(address, BigInt(allocation), proof)
+              .catch(() => 0n);
+          }
+
+          if (claimableRaw === 0n && allocation > 0) {
+            const allocationBig = BigInt(allocation);
+            claimableRaw = allocationBig > claimedRaw ? allocationBig - claimedRaw : 0n;
+          }
+
+          setTadzClaimData({
+            allocation,
+            claimed: Number(claimedRaw),
+            claimable: Number(claimableRaw),
+            proof,
+            loading: false
+          });
+        } else {
+          setTadzClaimData({ allocation: 0, claimed: 0, claimable: 0, proof: [], loading: false });
+        }
+      } else {
+        setOgNftData({ collections: [], totalOwned: 0, totalLocked: 0 });
+        setTadzClaimData({ allocation: 0, claimed: 0, claimable: 0, proof: [], loading: false });
+        setAllLockers([]);
+      }
       
     } catch (err) {
       console.error('Failed to load user data:', err);
@@ -1633,13 +1802,81 @@ useEffect(() => {
     setLoading(false);
   };
 
-  const handleLockOG = async (collection, tokenId) => {
-    showToast('error', 'OG Vault not available on Coston2 testnet');
+  const handleLockOGBatch = async (nftsToLock = []) => {
+    if (!signer || !walletAddress || !CONTRACTS.OGVault) return false;
+    if (!nftsToLock.length) return false;
+
+    setLoading(true);
+    try {
+      const ogVault = contracts.ogVault || new ethers.Contract(CONTRACTS.OGVault, ABIS.OGVault, signer);
+
+      const byCollection = new Map();
+      for (const item of nftsToLock) {
+        const collection = String(item.collection || '').toLowerCase();
+        const tokenId = Number(item.tokenId);
+        if (!collection || !Number.isFinite(tokenId) || tokenId <= 0) continue;
+        if (!byCollection.has(collection)) byCollection.set(collection, []);
+        byCollection.get(collection).push(tokenId);
+      }
+
+      for (const [collection, tokenIds] of byCollection.entries()) {
+        const nftContract = new ethers.Contract(collection, ABIS.ERC721, signer);
+        const approved = await nftContract.isApprovedForAll(walletAddress, CONTRACTS.OGVault);
+        if (!approved) {
+          const approveTx = await nftContract.setApprovalForAll(CONTRACTS.OGVault, true, { gasLimit: 800000 });
+          await approveTx.wait();
+        }
+
+        const tx = tokenIds.length === 1
+          ? await ogVault.lock(collection, tokenIds[0], { gasLimit: 800000 })
+          : await ogVault.lockBatch(collection, tokenIds, { gasLimit: 3000000 });
+        await tx.wait();
+      }
+
+      showToast('success', `Locked ${nftsToLock.length} OG NFT${nftsToLock.length === 1 ? '' : 's'}`);
+      await loadUserData(walletAddress, contracts);
+      return true;
+    } catch (err) {
+      console.error('OG lock failed:', err);
+      showToast('error', 'Lock failed: ' + getReadableError(err));
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Claim Tadz - not available on Coston2
+  const handleLockOG = async (collection, tokenId) => {
+    return handleLockOGBatch([{ collection, tokenId }]);
+  };
+
   const handleClaimTadz = async () => {
-    showToast('error', 'Tadz claim not available on Coston2 testnet');
+    if (!signer || !walletAddress || !CONTRACTS.TadzClaimer) return;
+
+    if (tadzClaimData.claimable <= 0) {
+      showToast('info', 'No Tadz available to claim yet.');
+      return;
+    }
+
+    setLoading(true);
+    setTadzClaimData((prev) => ({ ...prev, loading: true }));
+    try {
+      const tadzClaimer = contracts.tadzClaimer || new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, signer);
+      const tx = await tadzClaimer.claim(
+        BigInt(Math.max(0, tadzClaimData.allocation)),
+        tadzClaimData.proof || [],
+        { gasLimit: 1200000 }
+      );
+      await tx.wait();
+
+      showToast('success', `Claimed ${tadzClaimData.claimable} Tadz`);
+      await loadUserData(walletAddress, contracts);
+    } catch (err) {
+      console.error('Tadz claim failed:', err);
+      showToast('error', 'Claim failed: ' + getReadableError(err));
+    } finally {
+      setLoading(false);
+      setTadzClaimData((prev) => ({ ...prev, loading: false }));
+    }
   };
 
   const handleUnstakeNFT = async (collection, tokenId) => {
@@ -8978,19 +9215,23 @@ useEffect(() => {
 
             <button 
               onClick={async () => {
-                if (selectedNfts.length > 0) {
+                if (selectedNfts.length === 0) return;
+
+                if (stakeNftModal.type === 'og') {
+                  const nftsToLock = selectedNfts.map((nft) => ({
+                    tokenId: typeof nft === 'object' ? nft.tokenId : nft,
+                    collection: typeof nft === 'object' ? nft.collection : stakeNftModal.collection.address
+                  }));
+                  const success = await handleLockOGBatch(nftsToLock);
+                  if (!success) return;
+                } else {
                   for (const nft of selectedNfts) {
-                    // Handle both object format {tokenId, collection} and number format
                     const tokenId = typeof nft === 'object' ? nft.tokenId : nft;
                     const collection = typeof nft === 'object' ? nft.collection : stakeNftModal.collection.address;
-                    
-                    if (stakeNftModal.type === 'og') {
-                      await handleLockOG(collection, tokenId);
-                    } else {
-                      await handleStakeNFT(collection, tokenId);
-                    }
+                    await handleStakeNFT(collection, tokenId);
                   }
                 }
+
                 setSelectedNfts([]);
                 setStakeNftModal(null);
               }}
@@ -9554,11 +9795,11 @@ useEffect(() => {
             {lockInfoModal === 'toadz' && (
               <>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 }}>
-                  Receive 1 free 3D Toadz NFT for every 3 OGs you lock.
+                  Receive 3 free 3D Toadz NFTs for every OG you lock.
                 </div>
                 <div style={{ textAlign: 'center', padding: '20px 0' }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Your allocation</div>
-                  <div style={{ fontSize: 36, fontWeight: 900, color: '#a855f7' }}>{Math.floor(ogNftData.totalLocked / 3)}</div>
+                  <div style={{ fontSize: 36, fontWeight: 900, color: '#a855f7' }}>{ogNftData.totalLocked * 3}</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Lock more to earn more</div>
                 </div>
               </>

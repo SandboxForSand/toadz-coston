@@ -7,7 +7,11 @@ export const CONTRACTS = {
   ToadzStake: '0xd973E756fCcB640108aAf17B3465a387802A6E49',
   ToadzMarket: '0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F',
   Zap: '0xBeA2995513DCc193C39241E6Cd55AF53172a711E',
-  // Not deployed on Coston2 yet:
+  OGVault: '0x812B7F96966b94C9ECa198ac0553840ACabbd18A',
+  TadzClaimer: '0xdaE9CB4D6F686e31E12887a1C1c017Edf53e94B2',
+  TestOGCollection: '0x395ff0eA8B02e2eE261FFFDA8c6Df8e56512E04F',
+  TestTadzCollection: '0x0BF9068F7Ebdb222B4E7d613859Af286dC9E396D',
+  // Optional modules not deployed on this testnet app:
   // OGVaultOracle: '',
   // ToadzMint: '',
   // FToadz: '',
@@ -16,19 +20,9 @@ export const CONTRACTS = {
 // OG Vault eligible collections (lock forever for 2x)
 export const OG_COLLECTIONS = [
   { 
-    name: 'sToadz', 
-    address: '0x35afb6Ba51839dEDD33140A3b704b39933D1e642',
-    emoji: '🐸'
-  },
-  { 
-    name: 'Luxury Lofts', 
-    address: '0x91Aa85a172DD3e7EEA4ad1A4B33E90cbF3B99ed8',
-    emoji: '🏢'
-  },
-  { 
-    name: 'Songbird City', 
-    address: '0x360f8B7d9530F55AB8E52394E6527935635f51E7',
-    emoji: '🌆'
+    name: 'Test OG',
+    address: '0x395ff0eA8B02e2eE261FFFDA8c6Df8e56512E04F',
+    emoji: '🧪'
   },
 ];
 
@@ -147,6 +141,7 @@ export const ABIS = {
   OGVault: [
     'function lock(address collection, uint256 tokenId) external',
     'function lockBatch(address collection, uint256[] calldata tokenIds) external',
+    'function lockedCount(address user) view returns (uint256)',
     'function getOGCount(address user) view returns (uint256)',
     'function getLockedNfts(address user, address collection) view returns (uint256[])',
     'function getEligibleCollections() view returns (address[])',
@@ -155,6 +150,15 @@ export const ABIS = {
     'function getAllLockers() view returns (address[] lockers, uint256[] counts, uint256 total)',
     'function getLockerCount() view returns (uint256)',
     'function getTotalLocked() view returns (uint256)',
+  ],
+
+  TadzClaimer: [
+    'function claim(uint256 totalAllocation, bytes32[] calldata proof) external',
+    'function claimed(address user) view returns (uint256)',
+    'function getClaimable(address user, uint256 totalAllocation, bytes32[] calldata proof) view returns (uint256)',
+    'function availableTokens() view returns (uint256)',
+    'function getAutoAllocation(address user) view returns (uint256)',
+    'function ogVault() view returns (address)',
   ],
 };
 

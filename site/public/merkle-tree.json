@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-04T14:45:16.142Z",
+  "network": "coston2",
+  "ogVaultAddress": "0x812B7F96966b94C9ECa198ac0553840ACabbd18A",
+  "totalLockers": 1,
+  "totalLocks": 1,
+  "totalTadzToDistribute": 3,
+  "merkleRoot": "0x2ba52e30c313b8710738362428cf3c40d40737c6fd93de97562ebb2eb04439d2",
+  "proofs": {
+    "0x9bdb29529016a15754373b9d5b5116ab728e916e": {
+      "ogCount": 1,
+      "tadzAllocation": 3,
+      "proof": []
+    }
+  }
+}
