@@ -521,6 +521,7 @@ const ToadzFinal = () => {
         showToast('success', 'NFT listed for rent');
       }
       
+      setMarketRefresh((prev) => prev + 1);
       resetBoostListModal();
     } catch (err) {
       console.error('Error listing NFT:', err);
@@ -1265,10 +1266,18 @@ const syncToFlare = async () => {
 useEffect(() => {
     const loadMarketListings = async () => {
       try {
-        // Coston2 ToadzMarket doesn't have getAllActiveListings - skip
-        setFlareListings([]);
-        return;
-        const [collections, tokenIds, sellers, prices, commitmentDays, listedAts] = [[], [], [], [], [], []];
+        const readProvider = getReadProvider();
+        const market = new ethers.Contract(
+          CONTRACTS.ToadzMarket,
+          [
+            'function getAllActiveListings() view returns (address[] collections, uint256[] tokenIds, address[] sellers, uint256[] prices, uint256[] commitmentDays, uint256[] listedAts)',
+            'function getAllActiveRentalListings() view returns (address[] collections, uint256[] tokenIds, address[] owners, uint256[] dailyRates, uint256[] commitmentEnds)',
+            'function getActiveRental(address collection, uint256 tokenId) view returns (address renter, uint256 startTime, uint256 endTime, uint256 dailyRate, uint256 pendingPayment)'
+          ],
+          readProvider
+        );
+
+        const [collections, tokenIds, sellers, prices, commitmentDays, listedAts] = await market.getAllActiveListings();
         const saleListings = collections.map((c, i) => ({
           collection: c,
           tokenId: tokenIds[i].toString(),
@@ -1335,7 +1344,7 @@ useEffect(() => {
         if (bonezListings.length > 0) {
           const nftContract = new ethers.Contract(blockBonezAddr, [
             'function tokenURI(uint256 tokenId) view returns (string)'
-          ], provider);
+          ], readProvider);
           
           const imageCache = {};
           for (const listing of bonezListings) {
