@@ -294,6 +294,47 @@ const ToadzFinal = () => {
       if (owned.length > 0) return owned;
     }
 
+    // Test Tadz collection fallback: scan ownerOf over minted range.
+    if (
+      CONTRACTS.TestTadzCollection &&
+      String(collectionAddress).toLowerCase() === String(CONTRACTS.TestTadzCollection).toLowerCase()
+    ) {
+      try {
+        const scanContract = new ethers.Contract(
+          collectionAddress,
+          [
+            'function ownerOf(uint256 tokenId) view returns (address)',
+            'function nextTokenId() view returns (uint256)'
+          ],
+          readProvider
+        );
+        const nextTokenId = Number(await scanContract.nextTokenId());
+        const maxTokenId = Math.min(Math.max(0, nextTokenId - 1), 5000);
+        const owned = [];
+        const chunkSize = 50;
+        for (let start = 1; start <= maxTokenId; start += chunkSize) {
+          const end = Math.min(maxTokenId, start + chunkSize - 1);
+          const checks = [];
+          for (let tokenId = start; tokenId <= end; tokenId++) {
+            checks.push((async () => {
+              try {
+                const owner = await scanContract.ownerOf(tokenId);
+                if (String(owner).toLowerCase() === normalizedUser) {
+                  owned.push(tokenId);
+                }
+              } catch (_) {
+                // Ignore unminted token IDs.
+              }
+            })());
+          }
+          await Promise.all(checks);
+        }
+        if (owned.length > 0) return owned.sort((a, b) => a - b);
+      } catch (err) {
+        console.log('Test Tadz owner scan failed:', err?.message || err);
+      }
+    }
+
     try {
       const transferTopic = ethers.id('Transfer(address,address,uint256)');
       const userTopic = ethers.zeroPadValue(userAddress, 32);
@@ -513,8 +554,8 @@ const ToadzFinal = () => {
     setFetchingBoostNfts(true);
     const nfts = [];
     
-    // Use read-only provider - doesn't depend on wallet provider state
-    const readProvider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
+    // Prefer wallet provider to avoid browser CORS failures on public RPCs.
+    const readProvider = provider || (window.ethereum ? new ethers.BrowserProvider(window.ethereum) : getReadProvider());
     
     for (const col of BOOST_COLLECTIONS) {
       try {
