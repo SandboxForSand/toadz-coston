@@ -11,8 +11,11 @@ const EMPTY_MERKLE_TREE = Object.freeze({
 
 // Boost-eligible collections (Flare only for now)
 const BOOST_COLLECTIONS = [
-  // No NFT collections on Coston2 testnet
-];
+  {
+    name: 'Tadz',
+    address: CONTRACTS.TestTadzCollection
+  }
+].filter((collection) => Boolean(collection.address));
 
 // Platform wallets get 10 free listings
 const PLATFORM_WALLETS = [
@@ -20,6 +23,11 @@ const PLATFORM_WALLETS = [
   '0x6D69E5d3E51ef1eE47d3C73112aa74F6eA944895',
   '0xcf64CA3A422054DEb35C829a3fc79E03955daf4B'
 ].map(a => a.toLowerCase());
+
+const LISTING_FLR_PER_SLOT = 100;
+const TADZ_COLLECTION_ADDRESS = String(
+  CONTRACTS.TestTadzCollection || '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6'
+).toLowerCase();
 
 const ToadzFinal = () => {
   // Core navigation
@@ -70,6 +78,7 @@ const ToadzFinal = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCustomDeposit, setShowCustomDeposit] = useState(false);
   const [addAmount, setAddAmount] = useState('');
+  const [poolCapGuard, setPoolCapGuard] = useState(null); // { cap, total, available }
   const [showRedemption, setShowRedemption] = useState(false);
   const [lockExpired, setLockExpired] = useState(false);
   const [swapMode, setSwapMode] = useState(null);
@@ -372,7 +381,7 @@ const ToadzFinal = () => {
 
   // Fetch metadata when detail modal opens
   useEffect(() => {
-    if (nftDetailModal && nftDetailModal.collection?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6') {
+    if (nftDetailModal && nftDetailModal.collection?.toLowerCase() === TADZ_COLLECTION_ADDRESS) {
       setFetchingMetadata(true);
       fetch(`https://ipfs.io/ipfs/QmZchogrQg5oxnKA8azWPS6YtnGXyb6XsgWXt4kw7tuYby/${nftDetailModal.tokenId}.json`)
         .then(res => res.json())
@@ -407,14 +416,12 @@ const ToadzFinal = () => {
     }
     
     // Check listing limit
-    const isPlatform = PLATFORM_WALLETS.includes(walletAddress.toLowerCase());
-    const stakeBonus = Math.floor(user.lpPosition / 10000);
-    const maxListings = isPlatform ? 10 + stakeBonus : stakeBonus;
-    const currentListings = flareListings.filter(l => l.seller?.toLowerCase() === walletAddress.toLowerCase() && l.collection?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6').length;
+    const maxListings = getListingLimit(user.lpPosition, walletAddress);
+    const currentListings = getCurrentTadzListings(walletAddress);
     
     if (currentListings >= maxListings) {
       if (maxListings === 0) {
-        showToast('error', 'Stake FLR to unlock listings (10k FLR = 1 listing)');
+        showToast('error', `Stake FLR to unlock listings (${LISTING_FLR_PER_SLOT.toLocaleString()} FLR = 1 listing)`);
       } else {
         showToast('error', `Listing limit reached (${maxListings}). Stake more FLR for additional listings.`);
       }
@@ -511,23 +518,13 @@ const ToadzFinal = () => {
     
     for (const col of BOOST_COLLECTIONS) {
       try {
-        const contract = new ethers.Contract(col.address, [
-          'function balanceOf(address) view returns (uint256)',
-          'function tokenOfOwnerByIndex(address, uint256) view returns (uint256)',
-        ], readProvider);
-        
-        const balance = await contract.balanceOf(walletAddress);
-        for (let i = 0; i < Number(balance); i++) {
-          try {
-            const tokenId = await contract.tokenOfOwnerByIndex(walletAddress, i);
-            nfts.push({
-              collection: col.name,
-              address: col.address,
-              tokenId: Number(tokenId),
-            });
-          } catch (e) {
-            break;
-          }
+        const tokenIds = await getOwnedTokenIds(col.address, walletAddress, readProvider);
+        for (const tokenId of tokenIds) {
+          nfts.push({
+            collection: col.name,
+            address: col.address,
+            tokenId
+          });
         }
       } catch (e) {
         console.log(`Error fetching ${col.name}:`, e.message);
@@ -545,6 +542,12 @@ const ToadzFinal = () => {
       fetchUserBoostNfts();
     }
   }, [connected, walletAddress]);
+
+  useEffect(() => {
+    if (poolCapGuard) {
+      setPoolCapGuard(null);
+    }
+  }, [addAmount]);
 
   // Fetch NFTs when collection selected in ListModal
   useEffect(() => {
@@ -1267,7 +1270,7 @@ useEffect(() => {
         }
         
         // Fetch active rental status for ALL Tadz listings (not just rent-only)
-        const tadzAddr = '0xbaa8344f4a383796695C1F9f3aFE1eaFfdCfeaE6'.toLowerCase();
+        const tadzAddr = TADZ_COLLECTION_ADDRESS;
         const tadzListings = allListings.filter(l => 
           l.collection.toLowerCase() === tadzAddr
         );
@@ -1374,16 +1377,69 @@ useEffect(() => {
     });
   };
 
+  const getListingLimit = (lpPosition, address) => {
+    const isPlatform = address ? PLATFORM_WALLETS.includes(address.toLowerCase()) : false;
+    const stakeBonus = Math.floor((Number(lpPosition) || 0) / LISTING_FLR_PER_SLOT);
+    return isPlatform ? 10 + stakeBonus : stakeBonus;
+  };
+
+  const getCurrentTadzListings = (address) => {
+    if (!address) return 0;
+    return flareListings.filter(
+      (listing) =>
+        listing.seller?.toLowerCase() === address.toLowerCase() &&
+        listing.collection?.toLowerCase() === TADZ_COLLECTION_ADDRESS
+    ).length;
+  };
+
+  const getPoolCapSnapshot = async (stakeContract) => {
+    try {
+      const [totalStaked, cap] = await Promise.all([
+        stakeContract.totalWflrStaked(),
+        stakeContract.poolCap()
+      ]);
+      const total = Number(ethers.formatEther(totalStaked));
+      const maxCap = Number(ethers.formatEther(cap));
+      const available = Math.max(0, maxCap - total);
+      return { cap: maxCap, total, available };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const buildPoolCapMessage = (snapshot) => {
+    if (!snapshot) {
+      return 'Pool cap exceeded.';
+    }
+    return `Current cap ${formatDisplayAmount(snapshot.cap, 4)} CFLR exceeded. Max deposit is ${formatDisplayAmount(snapshot.available, 4)} FLR currently (cap - current). If you'd like cap raised further, please press button below.`;
+  };
+
+  const copyCapRaiseRequest = async () => {
+    if (!poolCapGuard) return;
+    const message = `Pool cap raise request (Coston2): cap ${formatDisplayAmount(poolCapGuard.cap, 4)} CFLR, currently staked ${formatDisplayAmount(poolCapGuard.total, 4)} FLR, available ${formatDisplayAmount(poolCapGuard.available, 4)} FLR.`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(message);
+        showToast('success', 'Cap raise request copied.');
+        return;
+      }
+    } catch (_) {}
+    showToast('info', message);
+  };
+
   // Contract actions
   const handleDeposit = async (amount, tier) => {
-    // Ensure on Coston2 network
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== COSTON2_CHAIN.chainId) {
-      await switchToFlare();
-    }
+    setPoolCapGuard(null);
 
     setLoading(true);
+    let toadzStakeForError = null;
     try {
+      // Ensure on Coston2 network
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== COSTON2_CHAIN.chainId) {
+        await switchToFlare();
+      }
+
       const web3Provider = new ethers.BrowserProvider(window.ethereum);
       const web3Signer = await web3Provider.getSigner();
       const address = await web3Signer.getAddress();
@@ -1391,6 +1447,24 @@ useEffect(() => {
       const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
       const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
       const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
+      toadzStakeForError = toadzStake;
+
+      const ensurePoolCapAvailable = async (stakeAmount) => {
+        if (stakeAmount <= 0n) return;
+        const [totalStaked, poolCap] = await Promise.all([
+          toadzStake.totalWflrStaked(),
+          toadzStake.poolCap()
+        ]);
+        if (poolCap > 0n && totalStaked + stakeAmount > poolCap) {
+          const snapshot = {
+            cap: Number(ethers.formatEther(poolCap)),
+            total: Number(ethers.formatEther(totalStaked)),
+            available: Number(ethers.formatEther(poolCap > totalStaked ? poolCap - totalStaked : 0n))
+          };
+          setPoolCapGuard(snapshot);
+          throw new Error(buildPoolCapMessage(snapshot));
+        }
+      };
 
       const inputBudget = ethers.parseEther(amount.toString());
       if (inputBudget <= 0n) {
@@ -1449,6 +1523,8 @@ useEffect(() => {
           );
         }
 
+        await ensurePoolCapAvailable(bestZapPlan.stakeAmount);
+
         try {
           await zap.zapDeposit.staticCall(
             bestZapPlan.stakeAmount,
@@ -1473,8 +1549,7 @@ useEffect(() => {
         await loadUserData(walletAddress, contracts);
         setShowCustomDeposit(false);
         setDepositFlr('');
-        setLoading(false);
-        return;
+        return true;
       }
 
       // Calculate incremental POND requirement using unstaked balance only.
@@ -1537,6 +1612,8 @@ useEffect(() => {
           `Amount too low after POND allocation. Minimum staked FLR is ${formatDisplayAmount(Number(ethers.formatEther(minStakeAmount)), 4)}.`
         );
       }
+
+      await ensurePoolCapAvailable(stakeAmount);
 
       const existingWflr = await wflr.balanceOf(address);
       const needToWrap = totalWflrNeeded > existingWflr ? totalWflrNeeded - existingWflr : 0n;
@@ -1601,11 +1678,28 @@ useEffect(() => {
       await loadUserData(walletAddress, contracts);
       setShowCustomDeposit(false);
       setDepositFlr('');
+      return true;
     } catch (err) {
       console.error('Deposit failed:', err);
-      showToast('error', 'Deposit failed: ' + (err.reason || err.shortMessage || err.message));
+      const rawMessage = err?.reason || err?.shortMessage || err?.message || 'Unknown error';
+      const lowered = rawMessage.toLowerCase();
+      if (lowered.includes('pool cap')) {
+        let finalMessage = rawMessage;
+        if (toadzStakeForError) {
+          const snapshot = await getPoolCapSnapshot(toadzStakeForError);
+          if (snapshot) {
+            setPoolCapGuard(snapshot);
+            finalMessage = buildPoolCapMessage(snapshot);
+          }
+        }
+        showToast('error', finalMessage);
+      } else {
+        showToast('error', 'Deposit failed: ' + rawMessage);
+      }
+      return false;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleWithdraw = async () => {
@@ -3255,7 +3349,7 @@ useEffect(() => {
 // ============ BOOST MARKET SECTION (REPLACES OLD MARKETPLACE) ============
   const BoostMarketSection = () => {
     // Filter Tadz listings only
-    const tadzAddr = '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6';
+    const tadzAddr = TADZ_COLLECTION_ADDRESS;
     const tadzListings = flareListings.filter(l => l.collection.toLowerCase() === tadzAddr);
     
     // Calculate stats
@@ -4095,7 +4189,7 @@ useEffect(() => {
                     key={idx}
                     onClick={() => setNftDetailModal({
                       tokenId: tokenId.toString(),
-                      collection: '0xbaa8344f4a383796695C1F9f3aFE1eaFfdCfeaE6',
+                      collection: TADZ_COLLECTION_ADDRESS,
                       image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${tokenId}.svg`,
                       animatedUrl: `https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs/${tokenId}_animated.svg`,
                       rank: Math.floor(tokenId * 0.24) + 1000
@@ -4314,10 +4408,8 @@ useEffect(() => {
               
               {/* Listing limit info */}
               {(() => {
-                const isPlatform = PLATFORM_WALLETS.includes(walletAddress.toLowerCase());
-                const stakeBonus = Math.floor(user.lpPosition / 10000);
-                const maxListings = isPlatform ? 10 + stakeBonus : stakeBonus;
-                const currentListings = flareListings.filter(l => l.seller?.toLowerCase() === walletAddress.toLowerCase() && l.collection?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6').length;
+                const maxListings = getListingLimit(user.lpPosition, walletAddress);
+                const currentListings = getCurrentTadzListings(walletAddress);
                 return (
                   <div style={{
                     background: currentListings >= maxListings ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.06)',
@@ -4332,7 +4424,7 @@ useEffect(() => {
                       <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
                     </div>
                     {maxListings === 0 && (
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>Stake 10k FLR to unlock listings</div>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
                     )}
                   </div>
                 );
@@ -4342,7 +4434,7 @@ useEffect(() => {
                 <div style={{ padding: isDesktop ? 32 : 24, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: isDesktop ? 13 : 12 }}>
                   Loading...
                 </div>
-              ) : userBoostNfts.filter(n => n.address?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6').length === 0 ? (
+              ) : userBoostNfts.filter(n => n.address?.toLowerCase() === String(CONTRACTS.TestTadzCollection || '').toLowerCase()).length === 0 ? (
                 <div style={{ padding: isDesktop ? 32 : 24, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: isDesktop ? 13 : 12 }}>
                   No Tadz in wallet
                 </div>
@@ -4355,7 +4447,7 @@ useEffect(() => {
                   overflowY: 'auto' 
                 }}>
                   {userBoostNfts
-                    .filter(n => n.address?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6')
+                    .filter(n => n.address?.toLowerCase() === String(CONTRACTS.TestTadzCollection || '').toLowerCase())
                     .map((nft, i) => {
                     const isListed = flareListings.some(
                       l => l.collection.toLowerCase() === nft.address?.toLowerCase() && 
@@ -4976,16 +5068,12 @@ useEffect(() => {
       }
       
       // Check listing limit
-      const isPlatform = PLATFORM_WALLETS.includes(walletAddress.toLowerCase());
-      const stakeBonus = Math.floor(user.lpPosition / 10000);
-      const maxListings = isPlatform ? 10 + stakeBonus : stakeBonus;
-      const currentListings = flareListings.filter(l => l.seller?.toLowerCase() === walletAddress.toLowerCase() && l.collection?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6').length;
+      const maxListings = getListingLimit(user.lpPosition, walletAddress);
+      const currentListings = getCurrentTadzListings(walletAddress);
       
       if (currentListings >= maxListings) {
-        if (isPlatform) {
-          showToast('error', `Listing limit reached (${maxListings}). Stake more FLR for additional listings.`);
-        } else if (maxListings === 0) {
-          showToast('error', 'Stake FLR to unlock listings (10k FLR = 1 listing)');
+        if (maxListings === 0) {
+          showToast('error', `Stake FLR to unlock listings (${LISTING_FLR_PER_SLOT.toLocaleString()} FLR = 1 listing)`);
         } else {
           showToast('error', `Listing limit reached (${maxListings}). Stake more FLR for additional listings.`);
         }
@@ -5088,10 +5176,8 @@ useEffect(() => {
               
               {/* Listing limit info */}
               {(() => {
-                const isPlatform = PLATFORM_WALLETS.includes(walletAddress.toLowerCase());
-                const stakeBonus = Math.floor(user.lpPosition / 10000);
-                const maxListings = isPlatform ? 10 + stakeBonus : stakeBonus;
-                const currentListings = flareListings.filter(l => l.seller?.toLowerCase() === walletAddress.toLowerCase() && l.collection?.toLowerCase() === '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6').length;
+                const maxListings = getListingLimit(user.lpPosition, walletAddress);
+                const currentListings = getCurrentTadzListings(walletAddress);
                 return (
                   <div style={{
                     background: currentListings >= maxListings ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.06)',
@@ -5106,7 +5192,7 @@ useEffect(() => {
                       <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
                     </div>
                     {maxListings === 0 && (
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Stake 10k FLR to unlock listings</div>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
                     )}
                   </div>
                 );
@@ -5904,7 +5990,7 @@ useEffect(() => {
         {/* Add Modal */}
         {showAddModal && (
           <div 
-            onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); setAddAmount(''); }}}
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); setAddAmount(''); setPoolCapGuard(null); }}}
             style={{
               position: 'fixed',
               top: 0, left: 0, right: 0, bottom: 0,
@@ -5927,7 +6013,7 @@ useEffect(() => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div style={{ fontSize: 20, fontWeight: 800 }}>Add to Position</div>
                 <button 
-                  onClick={() => { setShowAddModal(false); setAddAmount(''); }}
+                  onClick={() => { setShowAddModal(false); setAddAmount(''); setPoolCapGuard(null); }}
                   style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 24, cursor: 'pointer' }}
                 >×</button>
               </div>
@@ -5996,13 +6082,47 @@ useEffect(() => {
                   </div>
                 </div>
               )}
+
+              {poolCapGuard && (
+                <div style={{
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 12
+                }}>
+                  <div style={{ fontSize: 12, color: '#ff9a9a', lineHeight: 1.4 }}>
+                    {buildPoolCapMessage(poolCapGuard)}
+                  </div>
+                  <button
+                    onClick={copyCapRaiseRequest}
+                    style={{
+                      marginTop: 10,
+                      width: '100%',
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: 10,
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: '10px 12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Request Cap Raise
+                  </button>
+                </div>
+              )}
               
               <button 
                 onClick={async () => { 
                   if (Number(addAmount) > 0) {
-                    await handleDeposit(addAmount, lockTier);
-                    setShowAddModal(false); 
-                    setAddAmount(''); 
+                    const success = await handleDeposit(addAmount, lockTier);
+                    if (success) {
+                      setShowAddModal(false); 
+                      setAddAmount('');
+                      setPoolCapGuard(null);
+                    }
                   }
                 }}
                 disabled={loading || Number(addAmount) <= 0}
@@ -6135,6 +6255,11 @@ useEffect(() => {
               {positionTimeRemaining && (
                 <div style={{ marginTop: 4 }}>
                   Time remaining <span style={{ color: '#fff', fontWeight: 600 }}>{positionTimeRemaining}</span>
+                </div>
+              )}
+              {poolInfo.cap > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  Pool size <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(poolInfo.totalWflr)} / {formatDisplayAmount(poolInfo.cap)} FLR</span>
                 </div>
               )}
             </div>
