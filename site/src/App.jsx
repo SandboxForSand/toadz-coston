@@ -6531,22 +6531,9 @@ useEffect(() => {
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Your Position</div>
-              <div
-                key={`pool-position-${poolValuePulse}`}
-                style={{ fontSize: isDesktop ? 19 : 17, fontWeight: 800, marginTop: 2, animation: 'valueFade 220ms ease' }}
-              >
-                {formatDisplayAmount(projectedPositionFlr)} <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>FLR</span>
-              </div>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Total Pool</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-                {formatDisplayAmount(projectedPoolTotalFlr)} FLR
-              </div>
-
               <div
                 style={{
-                  marginTop: 12,
+                  marginTop: 2,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 7,
