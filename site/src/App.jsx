@@ -6754,7 +6754,7 @@ useEffect(() => {
           </div>
 
           <button
-            onClick={() => setActiveTab('market')}
+            onClick={() => setActiveTab('boost')}
             style={{
               width: '100%',
               marginTop: 15,
