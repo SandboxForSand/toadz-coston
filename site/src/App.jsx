@@ -2214,6 +2214,58 @@ useEffect(() => {
     topStakerPct: (poolStats.topStakerReturn || 0).toFixed(1)
   };
 
+  const currentPoolSharePct = poolInfo.totalWflr > 0 ? ((user.lpPosition / poolInfo.totalWflr) * 100) : 0;
+  const projectedPositionFlr = user.lpPosition + fomoFlrExtra;
+  const projectedPoolTotalFlr = poolInfo.totalWflr + fomoFlrExtra;
+  const projectedPoolSharePct = projectedPoolTotalFlr > 0 ? ((projectedPositionFlr / projectedPoolTotalFlr) * 100) : currentPoolSharePct;
+
+  const estimatePoolEarnings = (extraFlr) => {
+    const totalRewards = poolStats.totalPGS + poolStats.totalFtsoRewards;
+    if (totalRewards === 0 || user.totalDeposited === 0 || poolInfo.totalWflr === 0) return user.totalEarned;
+
+    const pgsRatio = poolStats.totalPGS / totalRewards;
+    const ftsoRatio = poolStats.totalFtsoRewards / totalRewards;
+    const userPGS = user.totalEarned * pgsRatio;
+    const userFTSO = user.totalEarned * ftsoRatio;
+    const newDeposit = user.totalDeposited + extraFlr;
+    const hypotheticalFTSO = userFTSO * (newDeposit / user.totalDeposited);
+    const oldShare = user.totalDeposited / poolInfo.totalWflr;
+    const newPool = poolInfo.totalWflr + extraFlr;
+    if (oldShare <= 0 || newPool <= 0) return user.totalEarned;
+    const newShare = newDeposit / newPool;
+    const hypotheticalPGS = userPGS * (newShare / oldShare);
+    return hypotheticalPGS + hypotheticalFTSO;
+  };
+
+  const poolEarningsPreview = estimatePoolEarnings(fomoFlrExtra);
+  const currentBoostValue = parseFloat(user.weight) || 1;
+  const projectedBoostValue = Math.min(5, currentBoostValue + fomoBoostExtra);
+  const boostEarningsPreview = currentBoostValue > 0
+    ? ((user.totalEarned / currentBoostValue) * projectedBoostValue)
+    : user.totalEarned;
+
+  const boostBars = (() => {
+    const base = isDesktop
+      ? [0.6, 0.8, 1.0, 1.15, 1.3, 1.5, 1.75, 2.1, 2.5, 3.0, 3.6, 4.2]
+      : [0.8, 1.0, 1.2, 1.5, 1.9, 2.4, 3.0, 4.0];
+    const bars = [];
+    let inserted = false;
+    for (const value of base) {
+      if (!inserted && currentBoostValue <= value) {
+        bars.push({ value: currentBoostValue, isUser: true });
+        inserted = true;
+      }
+      bars.push({ value, isUser: false });
+    }
+    if (!inserted) bars.push({ value: currentBoostValue, isUser: true });
+    return bars;
+  })();
+  const boostFieldAverage = (() => {
+    const peers = boostBars.filter((bar) => !bar.isUser);
+    if (peers.length === 0) return currentBoostValue;
+    return peers.reduce((sum, bar) => sum + bar.value, 0) / peers.length;
+  })();
+
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -6417,28 +6469,89 @@ useEffect(() => {
         </div>
         )}
 
-        {/* BOX 3: Pool Share with FOMO Slider */}
+        {/* BOX 3: Pool Share (redesign) */}
         {user.lpPosition > 0 && !lockExpired && (
         <div style={{
           background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 14,
-          padding: 16,
+          border: '1px solid rgba(34,197,94,0.2)',
+          borderRadius: 16,
+          padding: isDesktop ? '22px 20px' : '18px 16px',
           marginBottom: 12
         }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Pool Share</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#00ff88', marginBottom: 14 }}>
-            {poolInfo.totalWflr > 0 ? ((user.lpPosition / poolInfo.totalWflr) * 100).toFixed(2) : '0'}%
+          <div style={{ fontSize: 10, color: 'rgba(34,197,94,0.9)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Pool Share</div>
+
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 12 }}>
+            <div style={{ position: 'relative', width: isDesktop ? 156 : 132, height: isDesktop ? 156 : 132, flexShrink: 0 }}>
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  background: `conic-gradient(
+                    #22c55e 0 ${Math.max(0.8, Math.min(100, currentPoolSharePct))}%,
+                    ${projectedPoolSharePct > currentPoolSharePct ? `rgba(22,101,52,0.6) ${Math.max(0.8, Math.min(100, currentPoolSharePct))}% ${Math.max(0.8, Math.min(100, projectedPoolSharePct))}%,` : ''}
+                    #1b1b1b ${Math.max(0.8, Math.min(100, projectedPoolSharePct))}% 100%
+                  )`,
+                  boxShadow: '0 0 26px rgba(34,197,94,0.18)'
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: isDesktop ? 26 : 24,
+                  borderRadius: '50%',
+                  background: '#0a0a0a',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column'
+                }}
+              >
+                <div style={{ fontSize: isDesktop ? 26 : 22, fontWeight: 900, color: '#22c55e', lineHeight: 1 }}>
+                  {projectedPoolSharePct.toFixed(2)}%
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>of pool</div>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Your Position</div>
+              <div style={{ fontSize: isDesktop ? 19 : 17, fontWeight: 800, marginTop: 2 }}>
+                {formatDisplayAmount(projectedPositionFlr)} <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>FLR</span>
+              </div>
+
+              <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Total Pool</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+                {formatDisplayAmount(projectedPoolTotalFlr)} FLR
+              </div>
+
+              <div
+                style={{
+                  marginTop: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  background: 'rgba(34,197,94,0.08)',
+                  border: '1px solid rgba(34,197,94,0.28)'
+                }}
+              >
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Est. earnings</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#22c55e' }}>+{formatDisplayAmount(poolEarningsPreview)} FLR</span>
+              </div>
+            </div>
           </div>
-          
-          {/* Slider */}
-          <div style={{ marginBottom: 14 }}>
+
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 8 }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>If you had deposited</span>
-              <span style={{ fontWeight: 600, color: '#00ff88' }}>+{fomoFlrExtra.toLocaleString()} more</span>
+              <span style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: 0.6, textTransform: 'uppercase' }}>Add FLR</span>
+              <span style={{ fontWeight: 700, color: '#22c55e' }}>+{fomoFlrExtra.toLocaleString()} FLR</span>
             </div>
             <input
               type="range"
+              className="green-slider"
               min="0"
               max="10000"
               step="100"
@@ -6448,114 +6561,158 @@ useEffect(() => {
                 width: '100%',
                 height: 4,
                 borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)',
+                background: `linear-gradient(to right, rgba(34,197,94,0.7) ${(fomoFlrExtra / 10000) * 100}%, rgba(255,255,255,0.08) ${(fomoFlrExtra / 10000) * 100}%)`,
                 WebkitAppearance: 'none',
                 appearance: 'none',
                 outline: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                accentColor: '#22c55e'
               }}
             />
           </div>
-          
-          {/* FOMO Result */}
-          <div style={{
-            background: 'rgba(0,255,136,0.05)',
-            borderRadius: 8,
-            padding: 12,
-            textAlign: 'center',
-            marginBottom: 12
-          }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>You would have earned</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#00ff88' }}>
-              +{(() => {
-                const totalRewards = poolStats.totalPGS + poolStats.totalFtsoRewards;
-                if (totalRewards === 0 || user.totalDeposited === 0) return user.totalEarned.toFixed(2);
-                
-                const pgsRatio = poolStats.totalPGS / totalRewards;
-                const ftsoRatio = poolStats.totalFtsoRewards / totalRewards;
-                
-                const userPGS = user.totalEarned * pgsRatio;
-                const userFTSO = user.totalEarned * ftsoRatio;
-                
-                // FTSO scales directly with deposit
-                const newDeposit = user.totalDeposited + fomoFlrExtra;
-                const hypotheticalFTSO = userFTSO * (newDeposit / user.totalDeposited);
-                
-                // PGS scales with pool share
-                const oldShare = user.totalDeposited / poolInfo.totalWflr;
-                const newPool = poolInfo.totalWflr + fomoFlrExtra;
-                const newShare = newDeposit / newPool;
-                const hypotheticalPGS = userPGS * (newShare / oldShare);
-                
-                return (hypotheticalPGS + hypotheticalFTSO).toFixed(2);
-              })()} FLR
-            </div>
-            {fomoFlrExtra > 0 && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                +{(() => {
-                  const totalRewards = poolStats.totalPGS + poolStats.totalFtsoRewards;
-                  if (totalRewards === 0 || user.totalDeposited === 0) return '0.00';
-                  
-                  const pgsRatio = poolStats.totalPGS / totalRewards;
-                  const ftsoRatio = poolStats.totalFtsoRewards / totalRewards;
-                  
-                  const userPGS = user.totalEarned * pgsRatio;
-                  const userFTSO = user.totalEarned * ftsoRatio;
-                  
-                  const newDeposit = user.totalDeposited + fomoFlrExtra;
-                  const hypotheticalFTSO = userFTSO * (newDeposit / user.totalDeposited);
-                  
-                  const oldShare = user.totalDeposited / poolInfo.totalWflr;
-                  const newPool = poolInfo.totalWflr + fomoFlrExtra;
-                  const newShare = newDeposit / newPool;
-                  const hypotheticalPGS = userPGS * (newShare / oldShare);
-                  
-                  return ((hypotheticalPGS + hypotheticalFTSO) - user.totalEarned).toFixed(2);
-                })()} more than now
-              </div>
-            )}
-          </div>
-          
+
           <button
             onClick={() => setShowAddModal(true)}
             style={{
               width: '100%',
-              padding: '10px 12px',
-              background: 'rgba(0,255,136,0.08)',
-              border: '1px solid rgba(0,255,136,0.15)',
-              borderRadius: 8,
+              marginTop: 15,
+              padding: '12px 0',
+              background: 'rgba(34,197,94,0.12)',
+              border: '1px solid rgba(34,197,94,0.32)',
+              borderRadius: 10,
               cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#00ff88'
+              fontSize: 13,
+              fontWeight: 800,
+              color: '#22c55e',
+              letterSpacing: 0.4
             }}
           >Add FLR →</button>
         </div>
         )}
 
-        {/* BOX 4: Boost with FOMO Slider */}
+        {/* BOX 4: Boost (redesign) */}
         {user.lpPosition > 0 && !lockExpired && (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(236,72,153,0.08) 0%, rgba(168,85,247,0.05) 100%)',
-          border: '1px solid rgba(236,72,153,0.15)',
-          borderRadius: 14,
-          padding: 16,
+          background: 'linear-gradient(135deg, rgba(232,67,147,0.09) 0%, rgba(232,67,147,0.03) 100%)',
+          border: '1px solid rgba(232,67,147,0.24)',
+          borderRadius: 16,
+          padding: isDesktop ? '22px 20px' : '18px 16px',
           marginBottom: 20
         }}>
-          <div style={{ fontSize: 10, color: 'rgba(236,72,153,0.6)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Your Boost</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#ec4899', marginBottom: 14 }}>{user.weight}</div>
-          
-          {/* Slider */}
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(232,67,147,0.9)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Your Boost</div>
+              <div style={{ fontSize: 34, fontWeight: 900, color: '#e84393', lineHeight: 1, marginTop: 6 }}>{projectedBoostValue.toFixed(2)}x</div>
+            </div>
+            <div style={{ textAlign: 'right', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Field Average</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.72)' }}>{boostFieldAverage.toFixed(2)}x</div>
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 14,
+            background: 'rgba(0,0,0,0.28)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 10,
+            padding: isDesktop ? '12px 8px 9px' : '10px 6px 8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: isDesktop ? 4 : 3, height: isDesktop ? 160 : 128 }}>
+              {boostBars.map((bar, idx) => {
+                const maxBoost = Math.max(5, projectedBoostValue, ...boostBars.map((item) => item.value));
+                const baseHeight = Math.max(2, (bar.value / maxBoost) * (isDesktop ? 146 : 116));
+                const previewHeight = bar.isUser ? Math.max(baseHeight, (projectedBoostValue / maxBoost) * (isDesktop ? 146 : 116)) : baseHeight;
+                return (
+                  <div
+                    key={`${bar.value}-${idx}`}
+                    style={{
+                      flex: bar.isUser ? (isDesktop ? 1.9 : 1.7) : 1,
+                      maxWidth: bar.isUser ? (isDesktop ? 28 : 24) : (isDesktop ? 16 : 12),
+                      minWidth: bar.isUser ? (isDesktop ? 20 : 18) : (isDesktop ? 7 : 6),
+                      position: 'relative',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'flex-end'
+                    }}
+                  >
+                    {bar.isUser && projectedBoostValue > bar.value + 0.001 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          width: '100%',
+                          height: previewHeight,
+                          borderRadius: '4px 4px 2px 2px',
+                          border: '1px dashed rgba(232,67,147,0.45)',
+                          borderBottom: 'none',
+                          background: 'repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(232,67,147,0.2) 2px, rgba(232,67,147,0.2) 4px)'
+                        }}
+                      />
+                    )}
+                    <div
+                      style={{
+                        width: '100%',
+                        height: baseHeight,
+                        borderRadius: '4px 4px 2px 2px',
+                        background: bar.isUser
+                          ? 'linear-gradient(to top, #8b1a5a, #e84393)'
+                          : 'linear-gradient(to top, #1a1a1a, #2a2a2a)',
+                        boxShadow: bar.isUser ? '0 0 14px rgba(232,67,147,0.2)' : 'none',
+                        transition: 'height 220ms ease',
+                        position: 'relative',
+                        zIndex: 1
+                      }}
+                    />
+                    {bar.isUser && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: previewHeight + 7,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: '#e84393',
+                        letterSpacing: 0.6
+                      }}>
+                        YOU
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8, letterSpacing: 0.6 }}>
+              STAKERS RANKED BY BOOST
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: 'rgba(232,67,147,0.09)',
+                border: '1px solid rgba(232,67,147,0.28)'
+              }}
+            >
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Est. earnings</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#e84393' }}>+{formatDisplayAmount(boostEarningsPreview)} FLR</span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 8 }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)' }}>If you had</span>
-              <span style={{ fontWeight: 600, color: '#ec4899' }}>+{fomoBoostExtra.toFixed(1)}x more</span>
+              <span style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: 0.6, textTransform: 'uppercase' }}>Add Boost</span>
+              <span style={{ fontWeight: 700, color: '#e84393' }}>+{fomoBoostExtra.toFixed(1)}x</span>
             </div>
             <input
               type="range"
               className="pink-slider"
               min="0"
-              max={Math.max(0, 5 - parseFloat(user.weight || '1'))}
+              max={Math.max(0, 5 - currentBoostValue)}
               step="0.1"
               value={fomoBoostExtra}
               onChange={(e) => setFomoBoostExtra(Number(e.target.value))}
@@ -6563,56 +6720,30 @@ useEffect(() => {
                 width: '100%',
                 height: 4,
                 borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)',
+                background: `linear-gradient(to right, rgba(232,67,147,0.72) ${Math.max(0, Math.min(100, (fomoBoostExtra / Math.max(0.1, (5 - currentBoostValue))) * 100))}%, rgba(255,255,255,0.08) ${Math.max(0, Math.min(100, (fomoBoostExtra / Math.max(0.1, (5 - currentBoostValue))) * 100))}%)`,
                 WebkitAppearance: 'none',
                 appearance: 'none',
                 outline: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                accentColor: '#e84393'
               }}
             />
           </div>
-          
-          {/* FOMO Result */}
-          <div style={{
-            background: 'rgba(236,72,153,0.05)',
-            borderRadius: 8,
-            padding: 12,
-            textAlign: 'center',
-            marginBottom: 12
-          }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>You would have earned</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#ec4899' }}>
-              +{(() => {
-                const currentBoost = parseFloat(user.weight) || 1;
-                const newBoost = currentBoost + fomoBoostExtra;
-                const baseEarned = user.totalEarned / currentBoost;
-                return (baseEarned * newBoost).toFixed(2);
-              })()} FLR
-            </div>
-            {fomoBoostExtra > 0 && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                +{(() => {
-                  const currentBoost = parseFloat(user.weight) || 1;
-                  const newBoost = currentBoost + fomoBoostExtra;
-                  const baseEarned = user.totalEarned / currentBoost;
-                  return ((baseEarned * newBoost) - user.totalEarned).toFixed(2);
-                })()} more than now
-              </div>
-            )}
-          </div>
-          
+
           <button
             onClick={() => setActiveTab('market')}
             style={{
               width: '100%',
-              padding: '10px 12px',
-              background: 'rgba(236,72,153,0.1)',
-              border: '1px solid rgba(236,72,153,0.2)',
-              borderRadius: 8,
+              marginTop: 15,
+              padding: '12px 0',
+              background: 'rgba(232,67,147,0.14)',
+              border: '1px solid rgba(232,67,147,0.35)',
+              borderRadius: 10,
               cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#ec4899'
+              fontSize: 13,
+              fontWeight: 800,
+              color: '#e84393',
+              letterSpacing: 0.4
             }}
           >Get NFTs →</button>
         </div>
