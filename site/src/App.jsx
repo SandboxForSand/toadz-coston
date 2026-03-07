@@ -198,6 +198,8 @@ const ToadzFinal = () => {
   const [boostData, setBoostData] = useState({ boost: 0, stakedNfts: [] });
   const [fomoFlrExtra, setFomoFlrExtra] = useState(0);
   const [fomoBoostExtra, setFomoBoostExtra] = useState(0);
+  const [poolValuePulse, setPoolValuePulse] = useState(0);
+  const [boostValuePulse, setBoostValuePulse] = useState(0);
   const [mintData, setMintData] = useState({ isLive: false, totalMinted: 0, maxSupply: 0, credits: 0 });
   const [ogNftData, setOgNftData] = useState({ 
     collections: [], // { address, name, emoji, owned, locked }
@@ -2265,6 +2267,16 @@ useEffect(() => {
     if (peers.length === 0) return currentBoostValue;
     return peers.reduce((sum, bar) => sum + bar.value, 0) / peers.length;
   })();
+  const boostChartHeight = isDesktop ? 144 : 116;
+  const boostBarMaxHeight = isDesktop ? 132 : 104;
+
+  useEffect(() => {
+    setPoolValuePulse((v) => v + 1);
+  }, [fomoFlrExtra]);
+
+  useEffect(() => {
+    setBoostValuePulse((v) => v + 1);
+  }, [fomoBoostExtra]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -6508,7 +6520,10 @@ useEffect(() => {
                   flexDirection: 'column'
                 }}
               >
-                <div style={{ fontSize: isDesktop ? 26 : 22, fontWeight: 900, color: '#22c55e', lineHeight: 1 }}>
+                <div
+                  key={`pool-share-${poolValuePulse}`}
+                  style={{ fontSize: isDesktop ? 26 : 24, fontWeight: 900, color: '#22c55e', lineHeight: 1, animation: 'valueFade 220ms ease' }}
+                >
                   {projectedPoolSharePct.toFixed(2)}%
                 </div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>of pool</div>
@@ -6517,7 +6532,10 @@ useEffect(() => {
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Your Position</div>
-              <div style={{ fontSize: isDesktop ? 19 : 17, fontWeight: 800, marginTop: 2 }}>
+              <div
+                key={`pool-position-${poolValuePulse}`}
+                style={{ fontSize: isDesktop ? 19 : 17, fontWeight: 800, marginTop: 2, animation: 'valueFade 220ms ease' }}
+              >
                 {formatDisplayAmount(projectedPositionFlr)} <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>FLR</span>
               </div>
 
@@ -6539,7 +6557,12 @@ useEffect(() => {
                 }}
               >
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Est. earnings</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: '#22c55e' }}>+{formatDisplayAmount(poolEarningsPreview)} FLR</span>
+                <span
+                  key={`pool-earn-${poolValuePulse}`}
+                  style={{ fontSize: 14, fontWeight: 800, color: '#22c55e', animation: 'valueFade 220ms ease' }}
+                >
+                  +{formatDisplayAmount(poolEarningsPreview)} FLR
+                </span>
               </div>
             </div>
           </div>
@@ -6602,7 +6625,12 @@ useEffect(() => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 10, color: 'rgba(232,67,147,0.9)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Your Boost</div>
-              <div style={{ fontSize: 34, fontWeight: 900, color: '#e84393', lineHeight: 1, marginTop: 6 }}>{projectedBoostValue.toFixed(2)}x</div>
+              <div
+                key={`boost-value-${boostValuePulse}`}
+                style={{ fontSize: 34, fontWeight: 900, color: '#e84393', lineHeight: 1, marginTop: 6, animation: 'valueFade 220ms ease' }}
+              >
+                {projectedBoostValue.toFixed(2)}x
+              </div>
             </div>
             <div style={{ textAlign: 'right', marginTop: 2 }}>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Field Average</div>
@@ -6617,11 +6645,11 @@ useEffect(() => {
             borderRadius: 10,
             padding: isDesktop ? '12px 8px 9px' : '10px 6px 8px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: isDesktop ? 4 : 3, height: isDesktop ? 160 : 128 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: isDesktop ? 4 : 3, height: boostChartHeight }}>
               {boostBars.map((bar, idx) => {
                 const maxBoost = Math.max(5, projectedBoostValue, ...boostBars.map((item) => item.value));
-                const baseHeight = Math.max(2, (bar.value / maxBoost) * (isDesktop ? 146 : 116));
-                const previewHeight = bar.isUser ? Math.max(baseHeight, (projectedBoostValue / maxBoost) * (isDesktop ? 146 : 116)) : baseHeight;
+                const baseHeight = Math.max(2, (bar.value / maxBoost) * boostBarMaxHeight);
+                const previewHeight = bar.isUser ? Math.max(baseHeight, (projectedBoostValue / maxBoost) * boostBarMaxHeight) : baseHeight;
                 return (
                   <div
                     key={`${bar.value}-${idx}`}
@@ -6699,7 +6727,12 @@ useEffect(() => {
               }}
             >
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Est. earnings</span>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#e84393' }}>+{formatDisplayAmount(boostEarningsPreview)} FLR</span>
+              <span
+                key={`boost-earn-${boostValuePulse}`}
+                style={{ fontSize: 14, fontWeight: 800, color: '#e84393', animation: 'valueFade 220ms ease' }}
+              >
+                +{formatDisplayAmount(boostEarningsPreview)} FLR
+              </span>
             </div>
           </div>
 
@@ -10198,6 +10231,10 @@ useEffect(() => {
         @keyframes glowPulse {
           0%, 100% { box-shadow: 0 0 20px rgba(0,255,136,0.4), 0 0 60px rgba(0,255,136,0.2); }
           50% { box-shadow: 0 0 30px rgba(0,255,136,0.6), 0 0 80px rgba(0,255,136,0.3); }
+        }
+        @keyframes valueFade {
+          0% { opacity: 0.55; transform: translateY(1px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
         input::placeholder { color: rgba(255,255,255,0.3); }
         input[type="number"]::-webkit-inner-spin-button,
