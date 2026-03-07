@@ -6492,7 +6492,7 @@ useEffect(() => {
         }}>
           <div style={{ fontSize: 10, color: 'rgba(34,197,94,0.9)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Pool Share</div>
 
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: isDesktop ? 14 : 22, alignItems: 'center', marginTop: 12 }}>
             <div style={{ position: 'relative', width: isDesktop ? 156 : 132, height: isDesktop ? 156 : 132, flexShrink: 0 }}>
               <div
                 style={{
