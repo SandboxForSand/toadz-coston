@@ -6535,19 +6535,21 @@ useEffect(() => {
                 style={{
                   marginTop: 2,
                   display: 'inline-flex',
-                  flexDirection: isDesktop ? 'column' : 'row',
-                  alignItems: isDesktop ? 'flex-start' : 'center',
-                  gap: isDesktop ? 4 : 8,
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: 4,
                   padding: isDesktop ? '10px 16px' : '8px 12px',
-                  borderRadius: isDesktop ? 14 : 999,
+                  borderRadius: isDesktop ? 14 : 12,
                   background: 'rgba(34,197,94,0.08)',
-                  border: '1px solid rgba(34,197,94,0.28)'
+                  border: '1px solid rgba(34,197,94,0.28)',
+                  width: isDesktop ? 'auto' : 'min(188px, calc(100vw - 250px))',
+                  maxWidth: isDesktop ? 'none' : '100%'
                 }}
               >
                 <span style={{ fontSize: isDesktop ? 12 : 11, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>Est. earnings</span>
                 <span
                   key={`pool-earn-${poolValuePulse}`}
-                  style={{ fontSize: isDesktop ? 27 : 16, fontWeight: 900, color: '#22c55e', animation: 'valueFade 220ms ease', lineHeight: 1, whiteSpace: 'nowrap' }}
+                  style={{ fontSize: isDesktop ? 27 : 14, fontWeight: 900, color: '#22c55e', animation: 'valueFade 220ms ease', lineHeight: 1.05, whiteSpace: 'nowrap' }}
                 >
                   +{formatDisplayAmount(poolEarningsPreview)} FLR
                 </span>
