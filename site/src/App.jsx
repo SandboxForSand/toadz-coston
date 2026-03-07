@@ -6530,23 +6530,24 @@ useEffect(() => {
               </div>
             </div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: isDesktop ? 'center' : 'flex-start', justifyContent: isDesktop ? 'center' : 'flex-start' }}>
               <div
                 style={{
                   marginTop: 2,
                   display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  padding: '6px 12px',
-                  borderRadius: 999,
+                  flexDirection: isDesktop ? 'column' : 'row',
+                  alignItems: isDesktop ? 'flex-start' : 'center',
+                  gap: isDesktop ? 4 : 8,
+                  padding: isDesktop ? '10px 16px' : '8px 12px',
+                  borderRadius: isDesktop ? 14 : 999,
                   background: 'rgba(34,197,94,0.08)',
                   border: '1px solid rgba(34,197,94,0.28)'
                 }}
               >
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Est. earnings</span>
+                <span style={{ fontSize: isDesktop ? 12 : 11, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>Est. earnings</span>
                 <span
                   key={`pool-earn-${poolValuePulse}`}
-                  style={{ fontSize: 14, fontWeight: 800, color: '#22c55e', animation: 'valueFade 220ms ease' }}
+                  style={{ fontSize: isDesktop ? 27 : 16, fontWeight: 900, color: '#22c55e', animation: 'valueFade 220ms ease', lineHeight: 1, whiteSpace: 'nowrap' }}
                 >
                   +{formatDisplayAmount(poolEarningsPreview)} FLR
                 </span>
