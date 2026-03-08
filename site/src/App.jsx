@@ -2052,7 +2052,7 @@ useEffect(() => {
         const targetGas = 11_000_000n;
 
         while (remaining > 0) {
-          let chunk = Math.min(remaining, 250);
+          let chunk = Math.min(remaining, 700);
           let estimatedGas;
 
           while (chunk > 1) {
