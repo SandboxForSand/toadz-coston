@@ -44,6 +44,7 @@ contract TadzClaimer_TP is Initializable, OwnableUpgradeable, ReentrancyGuardUpg
     error NothingToClaim();
     error ClaimsPaused();
     error NotEnoughTokens();
+    error InvalidClaimAmount();
     error WithdrawLocked();
     
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -61,37 +62,52 @@ contract TadzClaimer_TP is Initializable, OwnableUpgradeable, ReentrancyGuardUpg
     }
     
     /**
-     * @notice Claim Tadz based on OG lock allocation
-     * @param totalAllocation Total Tadz allocated (ogCount * 3)
-     * @param proof Merkle proof
+     * @notice Transfer up to maxAmount claimable Tadz to user.
      */
-    function claim(uint256 totalAllocation, bytes32[] calldata proof) external nonReentrant {
-        if (paused) revert ClaimsPaused();
-        
-        // Verify merkle proof
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, totalAllocation));
-        if (!MerkleProof.verify(proof, merkleRoot, leaf)) revert InvalidProof();
-        
-        // Calculate how many to transfer
-        uint256 alreadyClaimed = claimed[msg.sender];
+    function _claimResolved(address user, uint256 totalAllocation, uint256 maxAmount) internal {
+        uint256 alreadyClaimed = claimed[user];
         if (totalAllocation <= alreadyClaimed) revert NothingToClaim();
-        uint256 toTransfer = totalAllocation - alreadyClaimed;
-        
+        if (maxAmount == 0) revert InvalidClaimAmount();
+
+        uint256 remaining = totalAllocation - alreadyClaimed;
+        uint256 toTransfer = maxAmount < remaining ? maxAmount : remaining;
         if (toTransfer > tokenIds.length) revert NotEnoughTokens();
-        
-        // Update claimed
-        claimed[msg.sender] = totalAllocation;
-        
-        // Transfer tokens (pop from end of array)
+
+        claimed[user] = alreadyClaimed + toTransfer;
+
         uint256[] memory sentIds = new uint256[](toTransfer);
         for (uint256 i = 0; i < toTransfer; i++) {
             uint256 tokenId = tokenIds[tokenIds.length - 1];
             tokenIds.pop();
-            tadz.transferFrom(address(this), msg.sender, tokenId);
+            tadz.transferFrom(address(this), user, tokenId);
             sentIds[i] = tokenId;
         }
+
+        emit Claimed(user, toTransfer, sentIds);
+    }
+
+    function claim(uint256 totalAllocation, bytes32[] calldata proof) external nonReentrant {
+        if (paused) revert ClaimsPaused();
         
-        emit Claimed(msg.sender, toTransfer, sentIds);
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, totalAllocation));
+        if (!MerkleProof.verify(proof, merkleRoot, leaf)) revert InvalidProof();
+        
+        _claimResolved(msg.sender, totalAllocation, type(uint256).max);
+    }
+
+    /**
+     * @notice Claim Tadz based on OG lock allocation.
+     * @param amount Max number of Tadz to claim in this tx.
+     * @param totalAllocation Total Tadz allocated (ogCount * 3).
+     * @param proof Merkle proof.
+     */
+    function claimPartial(uint256 amount, uint256 totalAllocation, bytes32[] calldata proof) external nonReentrant {
+        if (paused) revert ClaimsPaused();
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, totalAllocation));
+        if (!MerkleProof.verify(proof, merkleRoot, leaf)) revert InvalidProof();
+
+        _claimResolved(msg.sender, totalAllocation, amount);
     }
     
     /**

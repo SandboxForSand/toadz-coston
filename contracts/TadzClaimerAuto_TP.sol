@@ -37,6 +37,7 @@ contract TadzClaimerAuto_TP is Initializable, OwnableUpgradeable, ReentrancyGuar
     error NothingToClaim();
     error ClaimsPaused();
     error NotEnoughTokens();
+    error InvalidClaimAmount();
     error WithdrawLocked();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -83,29 +84,44 @@ contract TadzClaimerAuto_TP is Initializable, OwnableUpgradeable, ReentrancyGuar
         return (totalAllocation, valid);
     }
 
+    function _claimResolved(address user, uint256 allocation, uint256 maxAmount) internal {
+        uint256 alreadyClaimed = claimed[user];
+        if (allocation <= alreadyClaimed) revert NothingToClaim();
+        if (maxAmount == 0) revert InvalidClaimAmount();
+
+        uint256 remaining = allocation - alreadyClaimed;
+        uint256 toTransfer = maxAmount < remaining ? maxAmount : remaining;
+        if (toTransfer > tokenIds.length) revert NotEnoughTokens();
+
+        claimed[user] = alreadyClaimed + toTransfer;
+
+        uint256[] memory sentIds = new uint256[](toTransfer);
+        for (uint256 i = 0; i < toTransfer; i++) {
+            uint256 tokenId = tokenIds[tokenIds.length - 1];
+            tokenIds.pop();
+            tadz.transferFrom(address(this), user, tokenId);
+            sentIds[i] = tokenId;
+        }
+
+        emit Claimed(user, toTransfer, sentIds);
+    }
+
     function claim(uint256 totalAllocation, bytes32[] calldata proof) external nonReentrant {
         if (paused) revert ClaimsPaused();
 
         (uint256 allocation, bool proofValid) = _resolveAllocation(msg.sender, totalAllocation, proof);
         if (!proofValid) revert InvalidProof();
 
-        uint256 alreadyClaimed = claimed[msg.sender];
-        if (allocation <= alreadyClaimed) revert NothingToClaim();
-        uint256 toTransfer = allocation - alreadyClaimed;
+        _claimResolved(msg.sender, allocation, type(uint256).max);
+    }
 
-        if (toTransfer > tokenIds.length) revert NotEnoughTokens();
+    function claimPartial(uint256 amount, uint256 totalAllocation, bytes32[] calldata proof) external nonReentrant {
+        if (paused) revert ClaimsPaused();
 
-        claimed[msg.sender] = allocation;
+        (uint256 allocation, bool proofValid) = _resolveAllocation(msg.sender, totalAllocation, proof);
+        if (!proofValid) revert InvalidProof();
 
-        uint256[] memory sentIds = new uint256[](toTransfer);
-        for (uint256 i = 0; i < toTransfer; i++) {
-            uint256 tokenId = tokenIds[tokenIds.length - 1];
-            tokenIds.pop();
-            tadz.transferFrom(address(this), msg.sender, tokenId);
-            sentIds[i] = tokenId;
-        }
-
-        emit Claimed(msg.sender, toTransfer, sentIds);
+        _claimResolved(msg.sender, allocation, amount);
     }
 
     function getClaimable(

@@ -2023,14 +2023,67 @@ useEffect(() => {
     setTadzClaimData((prev) => ({ ...prev, loading: true }));
     try {
       const tadzClaimer = contracts.tadzClaimer || new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, signer);
-      const tx = await tadzClaimer.claim(
-        BigInt(Math.max(0, tadzClaimData.allocation)),
-        tadzClaimData.proof || [],
-        { gasLimit: 1200000 }
-      );
-      await tx.wait();
+      const allocationBn = BigInt(Math.max(0, tadzClaimData.allocation));
+      const proof = tadzClaimData.proof || [];
+      const totalClaimable = Math.max(0, Number(tadzClaimData.claimable || 0));
+      const supportsPartial = Boolean(tadzClaimer.claimPartial);
 
-      showToast('success', `Claimed ${tadzClaimData.claimable} Tadz`);
+      if (!supportsPartial || totalClaimable <= 120) {
+        let gasLimit;
+        try {
+          const estimatedGas = await tadzClaimer.claim.estimateGas(allocationBn, proof);
+          gasLimit = (estimatedGas * 130n) / 100n + 50000n;
+        } catch (estimateErr) {
+          console.warn('Tadz claim gas estimate failed, using fallback:', estimateErr);
+          const fallback = Math.max(700000, Math.ceil(totalClaimable) * 120000);
+          gasLimit = BigInt(fallback);
+        }
+
+        const tx = await tadzClaimer.claim(
+          allocationBn,
+          proof,
+          { gasLimit }
+        );
+        await tx.wait();
+      } else {
+        showToast('info', `Large claim (${totalClaimable}) detected. Claiming in batches...`);
+        let remaining = totalClaimable;
+        let claimedSoFar = 0;
+        const targetGas = 11_000_000n;
+
+        while (remaining > 0) {
+          let chunk = Math.min(remaining, 250);
+          let estimatedGas;
+
+          while (chunk > 1) {
+            try {
+              estimatedGas = await tadzClaimer.claimPartial.estimateGas(BigInt(chunk), allocationBn, proof);
+              if (estimatedGas <= targetGas) break;
+              chunk = Math.max(1, Math.floor(chunk * 0.75));
+            } catch (estimateErr) {
+              console.warn(`claimPartial gas estimate failed for chunk=${chunk}, reducing`, estimateErr);
+              chunk = Math.max(1, Math.floor(chunk / 2));
+              estimatedGas = null;
+            }
+          }
+
+          if (!estimatedGas) {
+            estimatedGas = await tadzClaimer.claimPartial.estimateGas(BigInt(chunk), allocationBn, proof);
+          }
+
+          const gasLimit = (estimatedGas * 130n) / 100n + 50000n;
+          const tx = await tadzClaimer.claimPartial(BigInt(chunk), allocationBn, proof, { gasLimit });
+          await tx.wait();
+
+          claimedSoFar += chunk;
+          remaining -= chunk;
+          if (remaining > 0) {
+            showToast('info', `Claim progress: ${claimedSoFar}/${totalClaimable} Tadz`);
+          }
+        }
+      }
+
+      showToast('success', `Claimed ${totalClaimable} Tadz`);
       await loadUserData(walletAddress, contracts);
     } catch (err) {
       console.error('Tadz claim failed:', err);

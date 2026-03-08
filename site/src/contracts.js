@@ -154,6 +154,7 @@ export const ABIS = {
 
   TadzClaimer: [
     'function claim(uint256 totalAllocation, bytes32[] calldata proof) external',
+    'function claimPartial(uint256 amount, uint256 totalAllocation, bytes32[] calldata proof) external',
     'function claimed(address user) view returns (uint256)',
     'function getClaimable(address user, uint256 totalAllocation, bytes32[] calldata proof) view returns (uint256)',
     'function availableTokens() view returns (uint256)',
