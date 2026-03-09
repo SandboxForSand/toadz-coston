@@ -25,6 +25,7 @@ contract ToadzMarketV5 is
 {
     uint256 public constant FEE_BPS = 500; // 5%
     uint256 public constant BPS = 10000;
+    uint256 private constant DEFAULT_LISTING_FLR_PER_SLOT = 1000 ether;
     
     // ============ V1/V2 Storage (DO NOT MODIFY ORDER) ============
     
@@ -94,6 +95,12 @@ contract ToadzMarketV5 is
     // Minimum LP required to rent (prevent dust rentals)
     uint256 public minLPForRental;
     
+    // FLR staked required for one listing slot (0 => default 1000 FLR)
+    uint256 public listingFlrPerSlot;
+    
+    // Per-wallet bonus listing slots
+    mapping(address => uint256) public bonusListingSlots;
+    
     // ============ Events ============
     
     event Listed(address indexed collection, uint256 indexed tokenId, address indexed seller, uint256 price);
@@ -107,6 +114,8 @@ contract ToadzMarketV5 is
     event RentalEnded(address indexed collection, uint256 indexed tokenId, address indexed renter, uint256 reason); // reason: 0=manual, 1=expired, 2=insufficient LP
     event RentProcessed(address indexed collection, uint256 indexed tokenId, address indexed owner, address renter, uint256 amount);
     event RentalListingCancelled(address indexed collection, uint256 indexed tokenId, address indexed owner);
+    event ListingSlotConfigUpdated(uint256 flrPerSlot);
+    event BonusListingSlotsUpdated(address indexed user, uint256 slots);
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -118,6 +127,7 @@ contract ToadzMarketV5 is
         __Pausable_init();
         __Ownable_init();
         feeRecipient = _feeRecipient;
+        listingFlrPerSlot = DEFAULT_LISTING_FLR_PER_SLOT;
     }
     
     // ============ Time Helpers ============
@@ -205,6 +215,26 @@ contract ToadzMarketV5 is
         }
     }
     
+    function _getListingFlrPerSlot() internal view returns (uint256) {
+        uint256 flrPerSlot = listingFlrPerSlot;
+        return flrPerSlot == 0 ? DEFAULT_LISTING_FLR_PER_SLOT : flrPerSlot;
+    }
+    
+    function getListingLimit(address user) public view returns (uint256) {
+        uint256 bonus = bonusListingSlots[user];
+        if (toadzStake == address(0)) return bonus;
+        
+        (uint256 wflrStaked,,,,,) = IToadzStake(toadzStake).positions(user);
+        uint256 slotByStake = wflrStaked / _getListingFlrPerSlot();
+        return slotByStake + bonus;
+    }
+    
+    function getListingUsage(address user) external view returns (uint256 used, uint256 max, uint256 remaining) {
+        used = userListingCount[user] + userRentalListingCount[user];
+        max = getListingLimit(user);
+        remaining = max > used ? max - used : 0;
+    }
+    
     // ============ Sale Functions ============
     
     function list(address collection, uint256 tokenId, uint256 price, uint256 commitmentDays) external nonReentrant whenNotPaused {
@@ -213,6 +243,9 @@ contract ToadzMarketV5 is
         require(listings[collection][tokenId].seller == address(0), "Already listed");
         require(commitmentDays >= 7, "Min 7 days commitment");
         require(!rentalListings[collection][tokenId].isActive, "Listed for rent");
+        
+        uint256 totalListings = userListingCount[msg.sender] + userRentalListingCount[msg.sender];
+        require(totalListings < getListingLimit(msg.sender), "Listing slots exceeded");
         
         IERC721Upgradeable nft = IERC721Upgradeable(collection);
         require(nft.ownerOf(tokenId) == msg.sender, "Not owner");
@@ -285,6 +318,9 @@ contract ToadzMarketV5 is
         require(commitmentDays >= 7, "Min 7 days commitment");
         require(!rentalListings[collection][tokenId].isActive, "Already listed for rent");
         require(listings[collection][tokenId].seller == address(0), "Listed for sale");
+        
+        uint256 totalListings = userListingCount[msg.sender] + userRentalListingCount[msg.sender];
+        require(totalListings < getListingLimit(msg.sender), "Listing slots exceeded");
         
         IERC721Upgradeable nft = IERC721Upgradeable(collection);
         require(nft.ownerOf(tokenId) == msg.sender, "Not owner");
@@ -663,6 +699,18 @@ contract ToadzMarketV5 is
     
     function setMinLPForRental(uint256 _minLP) external onlyOwner {
         minLPForRental = _minLP;
+    }
+    
+    function setListingFlrPerSlot(uint256 _flrPerSlot) external onlyOwner {
+        require(_flrPerSlot > 0, "Must be > 0");
+        listingFlrPerSlot = _flrPerSlot;
+        emit ListingSlotConfigUpdated(_flrPerSlot);
+    }
+    
+    function setBonusListingSlots(address user, uint256 slots) external onlyOwner {
+        require(user != address(0), "Zero address");
+        bonusListingSlots[user] = slots;
+        emit BonusListingSlotsUpdated(user, slots);
     }
     
     function pause() external onlyOwner { _pause(); }
