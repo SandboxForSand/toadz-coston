@@ -1448,6 +1448,10 @@ useEffect(() => {
     ).length;
   };
 
+  const listingSlotsMax = getListingLimit(user.lpPosition, walletAddress);
+  const listingSlotsUsed = getCurrentTadzListings(walletAddress);
+  const listingSlotsAtCap = listingSlotsUsed >= listingSlotsMax;
+
   const getPoolCapSnapshot = async (stakeContract) => {
     try {
       const [totalStaked, cap] = await Promise.all([
@@ -4803,6 +4807,21 @@ useEffect(() => {
                       <div style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.4)' }}>Tadz #{selectedBoostNft?.tokenId}</div>
                     </div>
                   </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: isDesktop ? '8px 10px' : '7px 9px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6,
+                    marginBottom: 10
+                  }}>
+                    <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
+                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00d4ff' }}>
+                      {listingSlotsUsed}/{listingSlotsMax}
+                    </span>
+                  </div>
 
                   {/* LP Row */}
                   <div style={{ 
@@ -4968,6 +4987,21 @@ useEffect(() => {
                       <div style={{ fontSize: isDesktop ? 15 : 13, fontWeight: 700, color: '#00ff88' }}>List for Rent</div>
                       <div style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.4)' }}>Tadz #{selectedBoostNft?.tokenId}</div>
                     </div>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: isDesktop ? '8px 10px' : '7px 9px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6,
+                    marginBottom: 10
+                  }}>
+                    <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
+                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                      {listingSlotsUsed}/{listingSlotsMax}
+                    </span>
                   </div>
 
                   {/* LP Row */}
