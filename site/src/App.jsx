@@ -3620,9 +3620,6 @@ useEffect(() => {
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: '8px 0 0 0', fontSize: 13 }}>
             Rent or buy boost power from Tadz holders
           </p>
-          <p style={{ color: 'rgba(0,255,136,0.75)', margin: '6px 0 0 0', fontSize: 12, fontWeight: 600 }}>
-            Listing rule: 1 Tadz listing per {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
-          </p>
         </div>
         
         {/* List Button */}
@@ -4663,6 +4660,9 @@ useEffect(() => {
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listings</span>
                       <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
                     </div>
+                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 4 }}>
+                      1 slot = {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
+                    </div>
                     {maxListings === 0 && (
                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
                     )}
@@ -5430,6 +5430,9 @@ useEffect(() => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listings</span>
                       <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 4 }}>
+                      1 slot = {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
                     </div>
                     {maxListings === 0 && (
                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
