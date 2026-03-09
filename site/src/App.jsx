@@ -3547,6 +3547,9 @@ useEffect(() => {
       walletAddress && l.seller.toLowerCase() === walletAddress.toLowerCase()
     ).length;
     const userTadzCount = userBoostNfts.filter(n => n.address?.toLowerCase() === tadzAddr).length;
+    const listingSlotsMax = getListingLimit(user.lpPosition, walletAddress);
+    const listingSlotsUsed = getCurrentTadzListings(walletAddress);
+    const listingSlotsAtCap = listingSlotsUsed >= listingSlotsMax;
     const totalRaritySupply = Array.isArray(rarityRanks) && rarityRanks.length > 0 ? rarityRanks.length : 100000;
 
     const normalizeTokenId = (tokenId) => {
@@ -4225,6 +4228,16 @@ useEffect(() => {
                 }}>
                   Tadz: <strong>{userTadzCount}</strong>
                 </div>
+                <div style={{
+                  background: listingSlotsAtCap ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.08)',
+                  border: `1px solid ${listingSlotsAtCap ? 'rgba(239,68,68,0.25)' : 'rgba(0,255,136,0.2)'}`,
+                  borderRadius: 6,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  color: listingSlotsAtCap ? '#ef4444' : '#00ff88'
+                }}>
+                  Slots: <strong>{listingSlotsUsed}/{listingSlotsMax}</strong>
+                </div>
                 {/* Sort tabs */}
                 <div style={{ display: 'flex', gap: 4 }}>
                   {['all', 'listed', 'unlisted'].map(filter => (
@@ -4645,26 +4658,25 @@ useEffect(() => {
               
               {/* Listing limit info */}
               {(() => {
-                const maxListings = getListingLimit(user.lpPosition, walletAddress);
-                const currentListings = getCurrentTadzListings(walletAddress);
                 return (
                   <div style={{
-                    background: currentListings >= maxListings ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.06)',
-                    border: `1px solid ${currentListings >= maxListings ? 'rgba(239,68,68,0.2)' : 'rgba(0,255,136,0.15)'}`,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 6,
                     padding: 10,
                     marginBottom: isDesktop ? 16 : 12,
                     fontSize: 11
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listings</span>
-                      <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
+                      <span style={{ fontWeight: 600, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                        {listingSlotsUsed} / {listingSlotsMax}
+                      </span>
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 4 }}>
-                      1 slot = {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
-                    </div>
-                    {maxListings === 0 && (
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
+                    {listingSlotsMax === 0 && (
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4 }}>
+                        Need {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked for your first listing slot
+                      </div>
                     )}
                   </div>
                 );
@@ -5416,26 +5428,25 @@ useEffect(() => {
               
               {/* Listing limit info */}
               {(() => {
-                const maxListings = getListingLimit(user.lpPosition, walletAddress);
-                const currentListings = getCurrentTadzListings(walletAddress);
                 return (
                   <div style={{
-                    background: currentListings >= maxListings ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.06)',
-                    border: `1px solid ${currentListings >= maxListings ? 'rgba(239,68,68,0.2)' : 'rgba(0,255,136,0.15)'}`,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 8,
                     padding: 12,
                     marginBottom: 16,
                     fontSize: 12
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listings</span>
-                      <span style={{ fontWeight: 600, color: currentListings >= maxListings ? '#ef4444' : '#00ff88' }}>{currentListings} / {maxListings}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
+                      <span style={{ fontWeight: 600, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                        {listingSlotsUsed} / {listingSlotsMax}
+                      </span>
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 4 }}>
-                      1 slot = {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
-                    </div>
-                    {maxListings === 0 && (
-                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Stake {LISTING_FLR_PER_SLOT.toLocaleString()} FLR to unlock listings</div>
+                    {listingSlotsMax === 0 && (
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+                        Need {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked for your first listing slot
+                      </div>
                     )}
                   </div>
                 );
