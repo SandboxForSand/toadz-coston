@@ -4229,12 +4229,12 @@ useEffect(() => {
                   Tadz: <strong>{userTadzCount}</strong>
                 </div>
                 <div style={{
-                  background: listingSlotsAtCap ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,136,0.08)',
-                  border: `1px solid ${listingSlotsAtCap ? 'rgba(239,68,68,0.25)' : 'rgba(0,255,136,0.2)'}`,
+                  background: listingSlotsAtCap ? 'rgba(0,255,136,0.14)' : 'rgba(0,255,136,0.08)',
+                  border: `1px solid ${listingSlotsAtCap ? 'rgba(0,255,136,0.35)' : 'rgba(0,255,136,0.2)'}`,
                   borderRadius: 6,
                   padding: '4px 10px',
                   fontSize: 12,
-                  color: listingSlotsAtCap ? '#ef4444' : '#00ff88'
+                  color: '#00ff88'
                 }}>
                   Slots: <strong>{listingSlotsUsed}/{listingSlotsMax}</strong>
                 </div>
@@ -4672,7 +4672,7 @@ useEffect(() => {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
-                      <span style={{ fontWeight: 600, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                      <span style={{ fontWeight: 600, color: '#00ff88' }}>
                         {listingSlotsUsed} / {listingSlotsMax}
                       </span>
                     </div>
@@ -4817,7 +4817,7 @@ useEffect(() => {
                     marginBottom: 6
                   }}>
                     <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
-                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00d4ff' }}>
+                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: '#00ff88' }}>
                       {listingSlotsUsed}/{listingSlotsMax}
                     </span>
                   </div>
@@ -4828,13 +4828,13 @@ useEffect(() => {
                     <button
                       onClick={() => { resetBoostListModal(); setActiveTab('pool'); }}
                       style={{
-                        background: 'rgba(239,68,68,0.08)',
-                        border: '1px solid rgba(239,68,68,0.25)',
+                        background: 'rgba(0,255,136,0.12)',
+                        border: '1px solid rgba(0,255,136,0.35)',
                         borderRadius: 6,
                         padding: isDesktop ? '8px 10px' : '7px 9px',
                         width: '100%',
                         textAlign: 'left',
-                        color: '#ef4444',
+                        color: '#00ff88',
                         fontSize: isDesktop ? 11 : 10,
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -5021,7 +5021,7 @@ useEffect(() => {
                     marginBottom: 6
                   }}>
                     <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
-                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                    <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: '#00ff88' }}>
                       {listingSlotsUsed}/{listingSlotsMax}
                     </span>
                   </div>
@@ -5032,13 +5032,13 @@ useEffect(() => {
                     <button
                       onClick={() => { resetBoostListModal(); setActiveTab('pool'); }}
                       style={{
-                        background: 'rgba(239,68,68,0.08)',
-                        border: '1px solid rgba(239,68,68,0.25)',
+                        background: 'rgba(0,255,136,0.12)',
+                        border: '1px solid rgba(0,255,136,0.35)',
                         borderRadius: 6,
                         padding: isDesktop ? '8px 10px' : '7px 9px',
                         width: '100%',
                         textAlign: 'left',
-                        color: '#ef4444',
+                        color: '#00ff88',
                         fontSize: isDesktop ? 11 : 10,
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -5521,7 +5521,7 @@ useEffect(() => {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
-                      <span style={{ fontWeight: 600, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
+                      <span style={{ fontWeight: 600, color: '#00ff88' }}>
                         {listingSlotsUsed} / {listingSlotsMax}
                       </span>
                     </div>
