@@ -407,6 +407,7 @@ const ToadzFinal = () => {
   const [nftMetadata, setNftMetadata] = useState(null);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
   const [yourFToadzSort, setYourFToadzSort] = useState('all'); // 'all', 'listed', 'unlisted'
+  const [yourFToadzOrder, setYourFToadzOrder] = useState('rarity_best'); // 'rarity_best', 'rarity_worst', 'token_asc'
   const [marketFilter, setMarketFilter] = useState('all'); // 'all', 'available', 'forSale'
   const [selectedRentalListing, setSelectedRentalListing] = useState(null);
   const [rarityRanks, setRarityRanks] = useState(null); // array where index = tokenId - 1, value = rank
@@ -550,6 +551,10 @@ const ToadzFinal = () => {
   // Fetch user's boost-eligible NFTs
   const [boostNftsPage, setBoostNftsPage] = useState(0);
   const BOOST_PAGE_SIZE = 100;
+
+  useEffect(() => {
+    setBoostNftsPage(0);
+  }, [yourFToadzSort, yourFToadzOrder]);
 
   const fetchUserBoostNfts = async () => {
     if (!walletAddress) return;
@@ -3542,6 +3547,63 @@ useEffect(() => {
       walletAddress && l.seller.toLowerCase() === walletAddress.toLowerCase()
     ).length;
     const userTadzCount = userBoostNfts.filter(n => n.address?.toLowerCase() === tadzAddr).length;
+    const totalRaritySupply = Array.isArray(rarityRanks) && rarityRanks.length > 0 ? rarityRanks.length : 100000;
+
+    const normalizeTokenId = (tokenId) => {
+      const parsed = Number(tokenId);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getTokenRank = (tokenId) => {
+      if (!Array.isArray(rarityRanks)) return null;
+      const normalized = normalizeTokenId(tokenId);
+      if (normalized <= 0) return null;
+      const rank = Number(rarityRanks[normalized - 1]);
+      return Number.isFinite(rank) && rank > 0 ? rank : null;
+    };
+
+    const getTopPercentLabel = (rank) => {
+      if (!rank) return null;
+      const pct = (rank / totalRaritySupply) * 100;
+      return pct < 0.1 ? '<0.1' : pct.toFixed(1);
+    };
+
+    const visibleUserTadzNfts = userBoostNfts
+      .filter(n => n.address?.toLowerCase() === tadzAddr)
+      .filter(nft => {
+        const isListed = flareListings.some(
+          l => l.collection.toLowerCase() === nft.address?.toLowerCase() &&
+               l.tokenId.toString() === nft.tokenId.toString()
+        );
+        if (yourFToadzSort === 'listed') return isListed;
+        if (yourFToadzSort === 'unlisted') return !isListed;
+        return true;
+      })
+      .sort((a, b) => {
+        const aId = normalizeTokenId(a.tokenId);
+        const bId = normalizeTokenId(b.tokenId);
+        if (yourFToadzOrder === 'token_asc') return aId - bId;
+
+        const aRank = getTokenRank(aId);
+        const bRank = getTokenRank(bId);
+        if (!aRank && !bRank) return aId - bId;
+        if (!aRank) return 1;
+        if (!bRank) return -1;
+
+        if (yourFToadzOrder === 'rarity_worst') {
+          if (aRank !== bRank) return bRank - aRank;
+          return aId - bId;
+        }
+
+        if (aRank !== bRank) return aRank - bRank;
+        return aId - bId;
+      });
+
+    const totalUserTadzPages = Math.ceil(visibleUserTadzNfts.length / BOOST_PAGE_SIZE);
+    const pagedUserTadzNfts = visibleUserTadzNfts.slice(
+      boostNftsPage * BOOST_PAGE_SIZE,
+      (boostNftsPage + 1) * BOOST_PAGE_SIZE
+    );
 
     return (
       <div style={{ marginTop: isDesktop ? 40 : 24, paddingBottom: 20 }}>
@@ -4183,6 +4245,24 @@ useEffect(() => {
                     >{filter}</button>
                   ))}
                 </div>
+                <select
+                  value={yourFToadzOrder}
+                  onChange={(e) => setYourFToadzOrder(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'rgba(255,255,255,0.85)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="rarity_best">Rarity: Best</option>
+                  <option value="rarity_worst">Rarity: Worst</option>
+                  <option value="token_asc">Token #</option>
+                </select>
               </div>
             </div>
             
@@ -4191,23 +4271,7 @@ useEffect(() => {
               gridTemplateColumns: isDesktop ? 'repeat(8, 1fr)' : 'repeat(4, 1fr)', 
               gap: 12 
             }}>
-              {(() => {
-                const filteredNfts = userBoostNfts
-                  .filter(n => n.address?.toLowerCase() === tadzAddr)
-                  .filter(nft => {
-                    const isListed = flareListings.some(
-                      l => l.collection.toLowerCase() === nft.address?.toLowerCase() && 
-                           l.tokenId.toString() === nft.tokenId.toString()
-                    );
-                    if (yourFToadzSort === 'listed') return isListed;
-                    if (yourFToadzSort === 'unlisted') return !isListed;
-                    return true;
-                  });
-                const totalPages = Math.ceil(filteredNfts.length / BOOST_PAGE_SIZE);
-                const pagedNfts = filteredNfts.slice(boostNftsPage * BOOST_PAGE_SIZE, (boostNftsPage + 1) * BOOST_PAGE_SIZE);
-                return pagedNfts;
-              })()
-                .map((nft, i) => {
+              {pagedUserTadzNfts.map((nft, i) => {
                   const listing = flareListings.find(
                     l => l.collection.toLowerCase() === nft.address?.toLowerCase() && 
                          l.tokenId.toString() === nft.tokenId.toString()
@@ -4215,6 +4279,8 @@ useEffect(() => {
                   const isListed = !!listing;
                   const hasPrice = listing && parseFloat(listing.price) > 0;
                   const boost = listing ? Math.min(5.0, 1 + listing.commitmentDays / 100) : 1.0;
+                  const rank = getTokenRank(nft.tokenId);
+                  const topPercent = getTopPercentLabel(rank);
                   
                   return (
                     <div 
@@ -4224,6 +4290,7 @@ useEffect(() => {
                         collection: nft.address,
                         image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`,
                         animatedUrl: `https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs/${nft.tokenId}_animated.svg`,
+                        rank,
                         owner: walletAddress
                       })}
                       style={{
@@ -4245,6 +4312,12 @@ useEffect(() => {
                         }}
                       />
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>#{nft.tokenId}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
+                        {rank ? `Rank #${rank.toLocaleString()}` : 'Rank —'}
+                      </div>
+                      <div style={{ fontSize: 9, color: '#00d4ff', marginTop: 1 }}>
+                        {topPercent ? `Top ${topPercent}%` : 'Top —'}
+                      </div>
                       {isListed && (
                         <>
                           <div style={{ fontSize: 10, color: '#00ff88', marginTop: 2 }}>{boost.toFixed(1)}x</div>
@@ -4283,25 +4356,23 @@ useEffect(() => {
                 }}>
                   No Tadz in wallet
                 </div>
+              ) : visibleUserTadzNfts.length === 0 ? (
+                <div style={{ 
+                  gridColumn: isDesktop ? 'span 8' : 'span 4',
+                  padding: 40,
+                  textAlign: 'center',
+                  color: 'rgba(255,255,255,0.4)',
+                  fontSize: 13
+                }}>
+                  No Tadz match current filters
+                </div>
               ) : null}
             </div>
             {(() => {
-              const filteredNfts = userBoostNfts
-                .filter(n => n.address?.toLowerCase() === tadzAddr)
-                .filter(nft => {
-                  const isListed = flareListings.some(
-                    l => l.collection.toLowerCase() === nft.address?.toLowerCase() && 
-                         l.tokenId.toString() === nft.tokenId.toString()
-                  );
-                  if (yourFToadzSort === 'listed') return isListed;
-                  if (yourFToadzSort === 'unlisted') return !isListed;
-                  return true;
-                });
-              const totalPages = Math.ceil(filteredNfts.length / BOOST_PAGE_SIZE);
-              if (totalPages <= 1) return null;
+              if (totalUserTadzPages <= 1) return null;
               return (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
-                  {Array.from({ length: totalPages }, (_, i) => (
+                  {Array.from({ length: totalUserTadzPages }, (_, i) => (
                     <button
                       key={i}
                       onClick={() => setBoostNftsPage(i)}
