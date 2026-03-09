@@ -23,7 +23,7 @@ const PLATFORM_WALLETS = [
   '0xcf64CA3A422054DEb35C829a3fc79E03955daf4B'
 ].map(a => a.toLowerCase());
 
-const LISTING_FLR_PER_SLOT = 100;
+const LISTING_FLR_PER_SLOT = 1000;
 const TADZ_COLLECTION_ADDRESS = String(
   CONTRACTS.TestTadzCollection || '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6'
 ).toLowerCase();
@@ -3619,6 +3619,9 @@ useEffect(() => {
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', margin: '8px 0 0 0', fontSize: 13 }}>
             Rent or buy boost power from Tadz holders
+          </p>
+          <p style={{ color: 'rgba(0,255,136,0.75)', margin: '6px 0 0 0', fontSize: 12, fontWeight: 600 }}>
+            Listing rule: 1 Tadz listing per {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
           </p>
         </div>
         
