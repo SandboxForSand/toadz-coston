@@ -1448,10 +1448,6 @@ useEffect(() => {
     ).length;
   };
 
-  const listingSlotsMax = getListingLimit(user.lpPosition, walletAddress);
-  const listingSlotsUsed = getCurrentTadzListings(walletAddress);
-  const listingSlotsAtCap = listingSlotsUsed >= listingSlotsMax;
-
   const getPoolCapSnapshot = async (stakeContract) => {
     try {
       const [totalStaked, cap] = await Promise.all([
@@ -4624,6 +4620,9 @@ useEffect(() => {
   // Boost List Modal
   const BoostListModal = () => {
     if (!showBoostListModal) return null;
+    const listingSlotsMax = getListingLimit(user.lpPosition, walletAddress);
+    const listingSlotsUsed = getCurrentTadzListings(walletAddress);
+    const listingSlotsAtCap = listingSlotsUsed >= listingSlotsMax;
 
     return (
       <div 
@@ -5321,6 +5320,9 @@ useEffect(() => {
     const targetChainId = isFlare ? '0xe' : '0x13';
     const marketAddress = isFlare ? CONTRACTS.ToadzMarket : CONTRACTS.ToadzMarket;
     const currency = isFlare ? 'FLR' : 'SGB';
+    const listingSlotsMax = getListingLimit(user.lpPosition, walletAddress);
+    const listingSlotsUsed = getCurrentTadzListings(walletAddress);
+    const listingSlotsAtCap = listingSlotsUsed >= listingSlotsMax;
 
     const collections = isFlare ? [
       { name: 'Block Bonez', address: '0xd1eF6460D9d06a4Ce74d9800b1BC11Ade822b349', emoji: '🦴' },
