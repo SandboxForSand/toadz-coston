@@ -4814,13 +4814,36 @@ useEffect(() => {
                     background: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 6,
-                    marginBottom: 10
+                    marginBottom: 6
                   }}>
                     <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
                     <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00d4ff' }}>
                       {listingSlotsUsed}/{listingSlotsMax}
                     </span>
                   </div>
+                  <div style={{ fontSize: isDesktop ? 10 : 9, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+                    1 NFT per {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
+                  </div>
+                  {listingSlotsAtCap && (
+                    <button
+                      onClick={() => { resetBoostListModal(); setActiveTab('pool'); }}
+                      style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: 6,
+                        padding: isDesktop ? '8px 10px' : '7px 9px',
+                        width: '100%',
+                        textAlign: 'left',
+                        color: '#ef4444',
+                        fontSize: isDesktop ? 11 : 10,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        marginBottom: 10
+                      }}
+                    >
+                      Stake FLR to unlock slots →
+                    </button>
+                  )}
 
                   {/* LP Row */}
                   <div style={{ 
@@ -4995,13 +5018,36 @@ useEffect(() => {
                     background: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 6,
-                    marginBottom: 10
+                    marginBottom: 6
                   }}>
                     <span style={{ fontSize: isDesktop ? 11 : 10, color: 'rgba(255,255,255,0.5)' }}>Listing slots</span>
                     <span style={{ fontSize: isDesktop ? 12 : 11, fontWeight: 700, color: listingSlotsAtCap ? '#ef4444' : '#00ff88' }}>
                       {listingSlotsUsed}/{listingSlotsMax}
                     </span>
                   </div>
+                  <div style={{ fontSize: isDesktop ? 10 : 9, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+                    1 NFT per {LISTING_FLR_PER_SLOT.toLocaleString()} FLR staked
+                  </div>
+                  {listingSlotsAtCap && (
+                    <button
+                      onClick={() => { resetBoostListModal(); setActiveTab('pool'); }}
+                      style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: 6,
+                        padding: isDesktop ? '8px 10px' : '7px 9px',
+                        width: '100%',
+                        textAlign: 'left',
+                        color: '#ef4444',
+                        fontSize: isDesktop ? 11 : 10,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        marginBottom: 10
+                      }}
+                    >
+                      Stake FLR to unlock slots →
+                    </button>
+                  )}
 
                   {/* LP Row */}
                   <div style={{ 
