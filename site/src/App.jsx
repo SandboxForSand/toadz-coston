@@ -25,6 +25,8 @@ const BOOST_NFT_FETCH_CHUNK = 30;
 const BOOST_NFT_CACHE_TTL_MS = 5 * 60 * 1000;
 const RENTAL_MODEL_REFRESH_MS = 5 * 60 * 1000;
 const RENTAL_MODEL_SAMPLE_BLOCKS = 2000;
+const RENTAL_MODEL_FALLBACK_DAILY_FLR = 12;
+const RENTAL_MODEL_CACHE_KEY = 'toadz_rental_model_cache_v1';
 
 const ToadzFinal = () => {
   // Core navigation
@@ -228,7 +230,8 @@ const ToadzFinal = () => {
     loading: false,
     dailyRewards: 0,
     totalEffective: 0,
-    asOf: 0
+    asOf: 0,
+    source: 'none'
   });
 
   const getReadProvider = () => {
@@ -940,15 +943,45 @@ React.useEffect(() => {
         }
       }
 
+      const liveDailyRewards = Number(ethers.formatEther(rewardSumRaw));
+      let resolvedDailyRewards = liveDailyRewards;
+      let source = 'live';
+
+      if (liveDailyRewards > 0) {
+        try {
+          window.localStorage.setItem(
+            RENTAL_MODEL_CACHE_KEY,
+            JSON.stringify({ dailyRewards: liveDailyRewards, asOf: Date.now() })
+          );
+        } catch (_) {
+          // Ignore storage issues.
+        }
+      } else {
+        let cachedDaily = 0;
+        try {
+          const cachedRaw = window.localStorage.getItem(RENTAL_MODEL_CACHE_KEY);
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw);
+            cachedDaily = Number(cached?.dailyRewards || 0);
+          }
+        } catch (_) {
+          // Ignore parse/storage issues.
+        }
+
+        resolvedDailyRewards = cachedDaily > 0 ? cachedDaily : RENTAL_MODEL_FALLBACK_DAILY_FLR;
+        source = 'shadow';
+      }
+
       setRentalPricingModel({
         loading: false,
-        dailyRewards: Number(ethers.formatEther(rewardSumRaw)),
+        dailyRewards: resolvedDailyRewards,
         totalEffective: Number(ethers.formatEther(totalEffectiveRaw)),
-        asOf: Date.now()
+        asOf: Date.now(),
+        source
       });
     } catch (err) {
       console.log('Failed to load rental pricing model:', err);
-      setRentalPricingModel((prev) => ({ ...prev, loading: false }));
+      setRentalPricingModel((prev) => ({ ...prev, loading: false, source: 'none' }));
     } finally {
       rentalPricingInFlightRef.current = false;
     }
@@ -3933,7 +3966,9 @@ useEffect(() => {
           {rentalPricingModel.loading
             ? 'Pricing model syncing...'
             : rentalPricingModel.asOf > 0
-              ? `Estimates use last 24h rewards (${formatDisplayAmount(rentalPricingModel.dailyRewards, 4)} FLR/day pool-wide).`
+              ? (rentalPricingModel.source === 'live'
+                ? 'Estimates based on recent reward flow.'
+                : 'Preview mode: using mirrored baseline rewards.')
               : 'Pricing model unavailable.'}
         </div>
 
