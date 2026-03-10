@@ -21,6 +21,8 @@ const LISTING_FLR_PER_SLOT = 1000;
 const TADZ_COLLECTION_ADDRESS = String(
   CONTRACTS.TestTadzCollection || '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6'
 ).toLowerCase();
+const BOOST_NFT_FETCH_CHUNK = 30;
+const BOOST_NFT_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const ToadzFinal = () => {
   // Core navigation
@@ -263,11 +265,24 @@ const ToadzFinal = () => {
       if (balance === 0) return [];
 
       const tokenIds = [];
-      for (let i = 0; i < balance; i++) {
-        const tokenId = await nft.tokenOfOwnerByIndex(userAddress, i);
-        tokenIds.push(Number(tokenId));
+      for (let start = 0; start < balance; start += BOOST_NFT_FETCH_CHUNK) {
+        const end = Math.min(balance, start + BOOST_NFT_FETCH_CHUNK);
+        const indices = Array.from({ length: end - start }, (_, offset) => start + offset);
+        const chunkIds = await Promise.all(
+          indices.map((i) =>
+            nft
+              .tokenOfOwnerByIndex(userAddress, i)
+              .then((tokenId) => Number(tokenId))
+              .catch(() => null)
+          )
+        );
+        tokenIds.push(...chunkIds.filter((tokenId) => tokenId !== null));
       }
-      return tokenIds;
+
+      if (tokenIds.length === balance) {
+        return tokenIds;
+      }
+      throw new Error('Enumerable token lookup incomplete');
     } catch (_) {
       // Non-enumerable NFT collections fall back to Transfer log reconstruction.
     }
@@ -552,30 +567,69 @@ const ToadzFinal = () => {
 
   const fetchUserBoostNfts = async () => {
     if (!walletAddress) return;
-    setFetchingBoostNfts(true);
+    const cacheKey = `toadz_boost_nfts_v3_${walletAddress.toLowerCase()}`;
+    let cachedNfts = null;
+    let cacheTimestamp = 0;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.nfts)) {
+            cachedNfts = parsed.nfts;
+            cacheTimestamp = Number(parsed?.ts || 0);
+          }
+        }
+      } catch (e) {
+        console.log('Boost NFT cache read failed:', e);
+      }
+    }
+
+    if (cachedNfts) {
+      setUserBoostNfts(cachedNfts);
+      setBoostNftsPage(0);
+    }
+
+    const cacheFresh = cacheTimestamp > 0 && (Date.now() - cacheTimestamp) < BOOST_NFT_CACHE_TTL_MS;
+    if (cacheFresh) {
+      setFetchingBoostNfts(false);
+      return;
+    }
+
+    setFetchingBoostNfts(!cachedNfts);
     const nfts = [];
     
     // Prefer wallet provider to avoid browser CORS failures on public RPCs.
     const readProvider = provider || (window.ethereum ? new ethers.BrowserProvider(window.ethereum) : getReadProvider());
     
-    for (const col of BOOST_COLLECTIONS) {
-      try {
-        const tokenIds = await getOwnedTokenIds(col.address, walletAddress, readProvider);
-        for (const tokenId of tokenIds) {
-          nfts.push({
-            collection: col.name,
-            address: col.address,
-            tokenId
-          });
+    try {
+      for (const col of BOOST_COLLECTIONS) {
+        try {
+          const tokenIds = await getOwnedTokenIds(col.address, walletAddress, readProvider);
+          for (const tokenId of tokenIds) {
+            nfts.push({
+              collection: col.name,
+              address: col.address,
+              tokenId
+            });
+          }
+        } catch (e) {
+          console.log(`Error fetching ${col.name}:`, e.message);
         }
-      } catch (e) {
-        console.log(`Error fetching ${col.name}:`, e.message);
       }
+      
+      setUserBoostNfts(nfts);
+      setBoostNftsPage(0);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), nfts }));
+        } catch (e) {
+          console.log('Boost NFT cache write failed:', e);
+        }
+      }
+    } finally {
+      setFetchingBoostNfts(false);
     }
-    
-    setUserBoostNfts(nfts);
-    setBoostNftsPage(0);
-    setFetchingBoostNfts(false);
   };
 
   // Fetch user's Tadz when connected
@@ -596,9 +650,50 @@ const ToadzFinal = () => {
     if (!showListModal || !walletAddress || !listModalCollection) return;
     
     const isFlare = marketSubTab === 'flare';
+    const collectionAddress = String(listModalCollection.address || '').toLowerCase();
+    const listModalCacheKey = `toadz_listmodal_nfts_v2_${walletAddress.toLowerCase()}_${collectionAddress}`;
+    const mapBoostToListNft = (nft) => ({
+      collection: nft.address,
+      collectionName: listModalCollection.name,
+      tokenId: Number(nft.tokenId),
+      image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`
+    });
+    const warmBoostNfts = userBoostNfts
+      .filter((n) => String(n.address || '').toLowerCase() === collectionAddress)
+      .map(mapBoostToListNft);
+
+    let cachedCollectionNfts = null;
+    let cacheFresh = false;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(listModalCacheKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.nfts)) {
+            cachedCollectionNfts = parsed.nfts;
+            const ts = Number(parsed?.ts || 0);
+            cacheFresh = ts > 0 && (Date.now() - ts) < BOOST_NFT_CACHE_TTL_MS;
+          }
+        }
+      } catch (e) {
+        console.log('List modal NFT cache read failed:', e);
+      }
+    }
+
+    if (warmBoostNfts.length > 0) {
+      setListModalCollectionNfts(warmBoostNfts);
+    } else if (cachedCollectionNfts) {
+      setListModalCollectionNfts(cachedCollectionNfts);
+    }
     
     const fetchCollectionNfts = async () => {
-      setListModalFetchingNfts(true);
+      setListModalFetchingNfts(warmBoostNfts.length === 0 && !cachedCollectionNfts);
+
+      if (cacheFresh && cachedCollectionNfts) {
+        setListModalFetchingNfts(false);
+        return;
+      }
+
       const nfts = [];
       
       try {
@@ -648,29 +743,28 @@ const ToadzFinal = () => {
             '0xbc42e9a6c24664749b2a0d571fd67f23386e34b8': (id) => `https://sparklesnft.imgix.net/ipfs/QmRCttzFebHEkmLzadbhkm2Wgy2Rh1FibrxXxRD93tr7Gp/${id}.png`,
           };
           
-          const provider = new ethers.JsonRpcProvider('https://coston2-api.flare.network/ext/C/rpc');
+          const provider = getReadProvider();
           
           const nftContract = new ethers.Contract(listModalCollection.address, [
             'function balanceOf(address) view returns (uint256)',
-            'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
             'function tokenURI(uint256 tokenId) view returns (string)'
           ], provider);
           
-          const balance = await nftContract.balanceOf(walletAddress);
-          const count = Math.min(Number(balance), 50);
-          
           const collAddr = listModalCollection.address.toLowerCase();
           const knownPattern = flareImagePatterns[collAddr];
-          
-          for (let i = 0; i < count; i++) {
+
+          const tokenIds = await getOwnedTokenIds(listModalCollection.address, walletAddress, provider);
+          const tokenIdsToRender = tokenIds.slice(0, 50);
+
+          for (const tokenIdRaw of tokenIdsToRender) {
             try {
-              const tokenId = await nftContract.tokenOfOwnerByIndex(walletAddress, i);
-              let image = knownPattern ? knownPattern(Number(tokenId)) : listModalCollection.image;
+              const tokenId = Number(tokenIdRaw);
+              let image = knownPattern ? knownPattern(tokenId) : listModalCollection.image;
               
               // Only fetch metadata if no known pattern (Block Bonez or unknown)
               if (!knownPattern || knownPattern === null) {
                 try {
-                  let uri = await nftContract.tokenURI(tokenId);
+                  let uri = await nftContract.tokenURI(tokenIdRaw);
                   if (uri.startsWith('ipfs://')) {
                     uri = uri.replace('ipfs://', 'https://sparklesnft.imgix.net/ipfs/');
                   }
@@ -690,11 +784,11 @@ const ToadzFinal = () => {
               nfts.push({
                 collection: listModalCollection.address,
                 collectionName: listModalCollection.name,
-                tokenId: Number(tokenId),
+                tokenId,
                 image
               });
             } catch (e) {
-              break;
+              console.log('Failed to build list modal NFT row:', e?.message || e);
             }
           }
         }
@@ -703,11 +797,18 @@ const ToadzFinal = () => {
       }
       
       setListModalCollectionNfts(nfts);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(listModalCacheKey, JSON.stringify({ ts: Date.now(), nfts }));
+        } catch (e) {
+          console.log('List modal NFT cache write failed:', e);
+        }
+      }
       setListModalFetchingNfts(false);
     };
     
     fetchCollectionNfts();
-  }, [showListModal, walletAddress, marketSubTab, listModalCollection]);
+  }, [showListModal, walletAddress, marketSubTab, listModalCollection, userBoostNfts]);
   
   // Switch to Coston2 testnet
   const switchToFlare = async () => {
