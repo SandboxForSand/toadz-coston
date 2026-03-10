@@ -3864,23 +3864,20 @@ useEffect(() => {
                           textAlign: 'center'
                         }}>RENTED</div>
                       ) : isOwner ? (
-                        <button 
-                          onClick={() => handleCancelListing(listing.collection, listing.tokenId, listing.isRentOnly)}
-                          style={{
-                            background: 'rgba(255,100,100,0.15)',
-                            color: '#ff6b6b',
-                            border: '1px solid rgba(255,100,100,0.3)',
-                            borderRadius: 6,
-                            padding: '6px 0',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            width: 70,
-                            textAlign: 'center'
-                          }}
-                        >
-                          Cancel
-                        </button>
+                        <div style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          color: 'rgba(255,255,255,0.6)',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 6,
+                          padding: '6px 0',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          width: 70,
+                          textAlign: 'center',
+                          letterSpacing: 0.5
+                        }}>
+                          LISTED
+                        </div>
                       ) : listing.isRentOnly ? (
                         <button 
                           onClick={() => {
@@ -4000,19 +3997,17 @@ useEffect(() => {
                         textAlign: 'center'
                       }}>RENTED</div>
                     ) : isOwner ? (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleCancelListing(listing.collection, listing.tokenId, listing.isRentOnly); }}
-                        style={{
-                          background: 'rgba(255,100,100,0.15)',
-                          border: '1px solid rgba(255,100,100,0.3)',
-                          borderRadius: 6,
-                          padding: '8px 0',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: '#ff6b6b',
-                          cursor: 'pointer'
-                        }}
-                      >Cancel</button>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        borderRadius: 6,
+                        padding: '8px 0',
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: 'rgba(255,255,255,0.6)',
+                        letterSpacing: 0.5,
+                        textAlign: 'center'
+                      }}>LISTED</div>
                     ) : listing.isRentOnly ? (
                       <button 
                         onClick={(e) => { e.stopPropagation(); setSelectedRentalListing(listing); setShowBoostRentModal(true); }}
