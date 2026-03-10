@@ -27,6 +27,8 @@ const RENTAL_MODEL_REFRESH_MS = 5 * 60 * 1000;
 const RENTAL_MODEL_SAMPLE_BLOCKS = 2000;
 const RENTAL_MODEL_FALLBACK_DAILY_FLR = 12;
 const RENTAL_MODEL_CACHE_KEY = 'toadz_rental_model_cache_v1';
+const RENTAL_CONSERVATIVE_STAKE_FLR = 1000;
+const RENTAL_CONSERVATIVE_LOCK_MULTIPLIER = 1;
 
 const ToadzFinal = () => {
   // Core navigation
@@ -2391,6 +2393,11 @@ useEffect(() => {
       showToast('error', 'Please connect wallet');
       return;
     }
+    const rentEstimate = getRentalEstimateForListing(listing);
+    if (rentEstimate && rentEstimate.netPerDay < 0) {
+      showToast('error', 'This rental is estimated negative for your position');
+      return;
+    }
     setLoading(true);
     try {
       const marketContract = new ethers.Contract(CONTRACTS.ToadzMarket, [
@@ -2569,6 +2576,24 @@ useEffect(() => {
     const currentEffective = weighted * (1 + currentBoostPct);
     const projectedEffective = weighted * (1 + currentBoostPct + listingBoostPct);
     const extraEffective = Math.max(0, projectedEffective - currentEffective);
+    if (extraEffective <= 0) return null;
+
+    const extraPerDay = (rentalPricingModel.dailyRewards * extraEffective) / rentalPricingModel.totalEffective;
+    const rentPerDay = Number(listing.dailyRate || 0);
+    const netPerDay = extraPerDay - rentPerDay;
+
+    return { extraPerDay, rentPerDay, netPerDay };
+  };
+
+  const getMarketBaselineEstimateForListing = (listing) => {
+    if (!listing?.isRentOnly) return null;
+    if (rentalPricingModel.totalEffective <= 0 || rentalPricingModel.dailyRewards <= 0) return null;
+
+    const listingBoostPct = Math.max(0, Math.min(4, Number(listing.commitmentDays || 0) / 100));
+    if (listingBoostPct <= 0) return null;
+
+    const weighted = RENTAL_CONSERVATIVE_STAKE_FLR * RENTAL_CONSERVATIVE_LOCK_MULTIPLIER;
+    const extraEffective = weighted * listingBoostPct;
     if (extraEffective <= 0) return null;
 
     const extraPerDay = (rentalPricingModel.dailyRewards * extraEffective) / rentalPricingModel.totalEffective;
@@ -3971,6 +3996,9 @@ useEffect(() => {
                 : 'Preview mode: using mirrored baseline rewards.')
               : 'Pricing model unavailable.'}
         </div>
+        <div style={{ marginBottom: 12, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+          Mkt net assumes 1,000 FLR staked at 1x lock.
+        </div>
 
         {/* Market Listings Table */}
         <div style={{
@@ -4037,10 +4065,19 @@ useEffect(() => {
               const price = parseFloat(listing.price);
               const rank = rarityRanks ? (rarityRanks[parseInt(listing.tokenId) - 1] || 0) : 0;
               const rentalEstimate = getRentalEstimateForListing(listing);
+              const marketEstimate = getMarketBaselineEstimateForListing(listing);
               
               // Check if rented (from contract or mock for demo)
               const isRented = listing.renter && listing.renter !== '0x0000000000000000000000000000000000000000';
               const rentalExpiresIn = listing.rentalExpiry ? Math.max(0, Math.ceil((listing.rentalExpiry - nowSeconds) / 86400)) : 0;
+              const rentBlocked = Boolean(
+                connected &&
+                listing.isRentOnly &&
+                !isOwner &&
+                !isRented &&
+                rentalEstimate &&
+                rentalEstimate.netPerDay < 0
+              );
               
               // Progressive boost glow
               const getBoostStyle = (boost) => {
@@ -4091,6 +4128,16 @@ useEffect(() => {
                             <span style={{ marginLeft: 6, color: 'rgba(139,92,246,0.7)' }}>Available in {rentalExpiresIn}d</span>
                           )}
                         </div>
+                        {connected && listing.isRentOnly && !isOwner && !isRented && rentalEstimate && (
+                          <div style={{
+                            fontSize: 9,
+                            marginTop: 2,
+                            color: rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b',
+                            fontWeight: 600
+                          }}>
+                            {rentalEstimate.netPerDay >= 0 ? 'Profitable for you' : 'Not profitable for you'}
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -4105,13 +4152,20 @@ useEffect(() => {
                         <>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR</div>
                           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>/day</div>
+                          <div style={{
+                            fontSize: 9,
+                            color: marketEstimate ? (marketEstimate.netPerDay >= 0 ? '#66ffc2' : '#ff9e9e') : 'rgba(255,255,255,0.35)',
+                            marginTop: 2
+                          }}>
+                            {marketEstimate ? `Mkt net ${formatSignedPerDay(marketEstimate.netPerDay)} /d` : 'Mkt net —'}
+                          </div>
                           {connected && (
                             <div style={{
                               fontSize: 9,
                               color: rentalEstimate ? (rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b') : 'rgba(255,255,255,0.35)',
                               marginTop: 2
                             }}>
-                              {rentalEstimate ? `Est net ${formatSignedPerDay(rentalEstimate.netPerDay)} /d` : 'Est net —'}
+                              {rentalEstimate ? `Your net ${formatSignedPerDay(rentalEstimate.netPerDay)} /d` : 'Your net —'}
                             </div>
                           )}
                         </>
@@ -4158,23 +4212,28 @@ useEffect(() => {
                       ) : listing.isRentOnly ? (
                         <button 
                           onClick={() => {
+                            if (rentBlocked) {
+                              showToast('error', 'Estimated net is negative for your current position');
+                              return;
+                            }
                             setSelectedRentalListing(listing);
                             setShowBoostRentModal(true);
                           }}
+                          disabled={rentBlocked}
                           style={{
-                            background: 'rgba(0,255,136,0.15)',
-                            color: '#00ff88',
-                            border: '1px solid rgba(0,255,136,0.3)',
+                            background: rentBlocked ? 'rgba(255,255,255,0.05)' : 'rgba(0,255,136,0.15)',
+                            color: rentBlocked ? 'rgba(255,255,255,0.45)' : '#00ff88',
+                            border: rentBlocked ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,255,136,0.3)',
                             borderRadius: 6,
                             padding: '6px 0',
                             fontSize: 11,
                             fontWeight: 600,
-                            cursor: 'pointer',
+                            cursor: rentBlocked ? 'not-allowed' : 'pointer',
                             width: 70,
                             textAlign: 'center'
                           }}
                         >
-                          Rent
+                          {rentBlocked ? 'Skip' : 'Rent'}
                         </button>
                       ) : (
                         <button 
@@ -4250,6 +4309,16 @@ useEffect(() => {
                           rarityRanks ? `Rank #${rank.toLocaleString()}` : '...'
                         )}
                       </div>
+                      {connected && listing.isRentOnly && !isOwner && !isRented && rentalEstimate && (
+                        <div style={{
+                          marginTop: 2,
+                          fontSize: 9,
+                          color: rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b',
+                          fontWeight: 600
+                        }}>
+                          {rentalEstimate.netPerDay >= 0 ? 'Profitable' : 'Not profitable'}
+                        </div>
+                      )}
                     </div>
                     
                     {/* DAYS with urgency - cap at 999 */}
@@ -4287,18 +4356,27 @@ useEffect(() => {
                       }}>LISTED</div>
                     ) : listing.isRentOnly ? (
                       <button 
-                        onClick={(e) => { e.stopPropagation(); setSelectedRentalListing(listing); setShowBoostRentModal(true); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (rentBlocked) {
+                            showToast('error', 'Estimated net is negative for your current position');
+                            return;
+                          }
+                          setSelectedRentalListing(listing);
+                          setShowBoostRentModal(true);
+                        }}
+                        disabled={rentBlocked}
                         style={{
-                          background: 'rgba(0,255,136,0.15)',
-                          border: '1px solid rgba(0,255,136,0.3)',
+                          background: rentBlocked ? 'rgba(255,255,255,0.05)' : 'rgba(0,255,136,0.15)',
+                          border: rentBlocked ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,255,136,0.3)',
                           borderRadius: 6,
                           padding: '8px 0',
                           fontSize: 11,
                           fontWeight: 600,
-                          color: '#00ff88',
-                          cursor: 'pointer'
+                          color: rentBlocked ? 'rgba(255,255,255,0.45)' : '#00ff88',
+                          cursor: rentBlocked ? 'not-allowed' : 'pointer'
                         }}
-                      >Rent</button>
+                      >{rentBlocked ? 'Skip' : 'Rent'}</button>
                     ) : (
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleBuyNFT(listing.collection, listing.tokenId, listing.price); }}
@@ -4328,13 +4406,25 @@ useEffect(() => {
                           <div style={{ textAlign: 'center', marginBottom: 12 }}>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR / day</div>
                             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Deducted from your staked LP</div>
+                            {marketEstimate && (
+                              <div style={{
+                                marginTop: 8,
+                                fontSize: 10,
+                                color: marketEstimate.netPerDay >= 0 ? '#66ffc2' : '#ff9e9e'
+                              }}>
+                                Mkt net: {formatSignedPerDay(marketEstimate.netPerDay)} FLR/day
+                              </div>
+                            )}
                             {connected && (
                               <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
                                 {rentalEstimate ? (
                                   <>
                                     <div>Est extra: +{formatDisplayAmount(rentalEstimate.extraPerDay, 4)} FLR/day</div>
                                     <div style={{ color: rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b' }}>
-                                      Est net: {formatSignedPerDay(rentalEstimate.netPerDay)} FLR/day
+                                      Your net: {formatSignedPerDay(rentalEstimate.netPerDay)} FLR/day
+                                    </div>
+                                    <div style={{ marginTop: 2, color: rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b', fontWeight: 600 }}>
+                                      {rentalEstimate.netPerDay >= 0 ? 'Profitable for you' : 'Not profitable for you'}
                                     </div>
                                   </>
                                 ) : (
@@ -4344,19 +4434,27 @@ useEffect(() => {
                             )}
                           </div>
                           <button 
-                            onClick={() => { setSelectedRentalListing(listing); setShowBoostRentModal(true); }}
+                            onClick={() => {
+                              if (rentBlocked) {
+                                showToast('error', 'Estimated net is negative for your current position');
+                                return;
+                              }
+                              setSelectedRentalListing(listing);
+                              setShowBoostRentModal(true);
+                            }}
+                            disabled={rentBlocked}
                             style={{
                               width: '100%',
-                              background: '#00ff88',
-                              border: 'none',
+                              background: rentBlocked ? 'rgba(255,255,255,0.06)' : '#00ff88',
+                              border: rentBlocked ? '1px solid rgba(255,255,255,0.12)' : 'none',
                               borderRadius: 6,
                               padding: '10px',
                               fontSize: 12,
                               fontWeight: 600,
-                              color: '#000',
-                              cursor: 'pointer'
+                              color: rentBlocked ? 'rgba(255,255,255,0.45)' : '#000',
+                              cursor: rentBlocked ? 'not-allowed' : 'pointer'
                             }}
-                          >Rent This Boost</button>
+                          >{rentBlocked ? 'Skip This Rental' : 'Rent This Boost'}</button>
                         </>
                       ) : (
                         <>
@@ -5528,6 +5626,8 @@ useEffect(() => {
     const boost = Math.min(5.0, 1 + listing.commitmentDays / 100);
     const nftImage = `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${listing.tokenId}.svg`;
     const rentEstimate = getRentalEstimateForListing(listing);
+    const marketEstimate = getMarketBaselineEstimateForListing(listing);
+    const rentBlocked = Boolean(connected && rentEstimate && rentEstimate.netPerDay < 0);
 
     return (
       <div 
@@ -5600,6 +5700,11 @@ useEffect(() => {
             <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, color: '#00ff88' }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR/day</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Deducted daily from your staked LP</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>No upfront payment required</div>
+            {marketEstimate && (
+              <div style={{ marginTop: 8, fontSize: 11, color: marketEstimate.netPerDay >= 0 ? '#66ffc2' : '#ff9e9e' }}>
+                Mkt net: <span style={{ fontWeight: 700 }}>{formatSignedPerDay(marketEstimate.netPerDay)} FLR/day</span>
+              </div>
+            )}
             {connected && (
               <div style={{
                 marginTop: 12,
@@ -5615,7 +5720,10 @@ useEffect(() => {
                       Est extra: <span style={{ color: '#00ff88', fontWeight: 700 }}>+{formatDisplayAmount(rentEstimate.extraPerDay, 4)} FLR/day</span>
                     </div>
                     <div style={{ fontSize: 11, marginTop: 4, color: rentEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b' }}>
-                      Est net: <span style={{ fontWeight: 700 }}>{formatSignedPerDay(rentEstimate.netPerDay)} FLR/day</span>
+                      Your net: <span style={{ fontWeight: 700 }}>{formatSignedPerDay(rentEstimate.netPerDay)} FLR/day</span>
+                    </div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: rentEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b', fontWeight: 600 }}>
+                      {rentEstimate.netPerDay >= 0 ? 'Profitable for you' : 'Not profitable for you'}
                     </div>
                   </>
                 ) : (
@@ -5631,20 +5739,21 @@ useEffect(() => {
             onClick={() => {
               handleRentNFT(selectedRentalListing, selectedRentalListing.commitmentDays);
             }}
+            disabled={rentBlocked}
             style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
-              border: 'none',
+              background: rentBlocked ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
+              border: rentBlocked ? '1px solid rgba(255,255,255,0.14)' : 'none',
               borderRadius: 12,
               padding: '16px',
-              color: '#000',
+              color: rentBlocked ? 'rgba(255,255,255,0.45)' : '#000',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: rentBlocked ? 'not-allowed' : 'pointer',
               fontSize: 16,
               marginBottom: 12,
-              boxShadow: '0 4px 12px rgba(0,255,136,0.3)'
+              boxShadow: rentBlocked ? 'none' : '0 4px 12px rgba(0,255,136,0.3)'
             }}
-          >Rent This Boost</button>
+          >{rentBlocked ? 'Not Profitable For You' : 'Rent This Boost'}</button>
           
           <button 
             onClick={() => resetBoostRentModal()}
