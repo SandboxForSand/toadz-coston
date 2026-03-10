@@ -17,12 +17,6 @@ const BOOST_COLLECTIONS = [
   }
 ].filter((collection) => Boolean(collection.address));
 
-// Platform wallets get 10 free listings
-const PLATFORM_WALLETS = [
-  '0x6D69E5d3E51ef1eE47d3C73112aa74F6eA944895',
-  '0xcf64CA3A422054DEb35C829a3fc79E03955daf4B'
-].map(a => a.toLowerCase());
-
 const LISTING_FLR_PER_SLOT = 1000;
 const TADZ_COLLECTION_ADDRESS = String(
   CONTRACTS.TestTadzCollection || '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6'
@@ -1434,9 +1428,8 @@ useEffect(() => {
   };
 
   const getListingLimit = (lpPosition, address) => {
-    const isPlatform = address ? PLATFORM_WALLETS.includes(address.toLowerCase()) : false;
     const stakeBonus = Math.floor((Number(lpPosition) || 0) / LISTING_FLR_PER_SLOT);
-    return isPlatform ? 10 + stakeBonus : stakeBonus;
+    return stakeBonus;
   };
 
   const getCurrentTadzListings = (address) => {
