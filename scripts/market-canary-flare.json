@@ -1,0 +1,17 @@
+{
+  "network": "flare",
+  "timestamp": "2026-03-10T13:41:19.870Z",
+  "deployer": "0x9bDB29529016a15754373B9D5B5116AB728E916e",
+  "contracts": {
+    "marketProxy": "0x896625DdA10c3B09EE2d3A91cD5AA69761c0Ad66",
+    "marketImpl": "0x2B9386F70d6d7059E8A41249dbB532887b2CEc65",
+    "proxyAdmin": "0xEb142De39F3182300D581771B601f7f1042D49e2"
+  },
+  "config": {
+    "feeRecipient": "0x76613C34bBA7cF6283d448adb2fFdf4d96eee176",
+    "toadzStake": "0xef3722efB994bb7657616763ffD7e70f5E1b2999",
+    "boostRegistry": "0x62a47BD9fba669a2BE0641f4cB1c987698605e69",
+    "tadzCollection": "0xbaa8344f4a383796695C1F9f3aFE1eaFfdCfeaE6",
+    "listingFlrPerSlot": "1000000000000000000000"
+  }
+}
