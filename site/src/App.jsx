@@ -23,6 +23,8 @@ const TADZ_COLLECTION_ADDRESS = String(
 ).toLowerCase();
 const BOOST_NFT_FETCH_CHUNK = 30;
 const BOOST_NFT_CACHE_TTL_MS = 5 * 60 * 1000;
+const RENTAL_MODEL_REFRESH_MS = 5 * 60 * 1000;
+const RENTAL_MODEL_SAMPLE_BLOCKS = 2000;
 
 const ToadzFinal = () => {
   // Core navigation
@@ -217,10 +219,17 @@ const ToadzFinal = () => {
   const inflowHistoryRef = useRef([]);
   const inflowSyncInFlightRef = useRef(false);
   const userDataInFlightRef = useRef(false);
+  const rentalPricingInFlightRef = useRef(false);
   const readProviderRef = useRef(null);
   const merkleCacheRef = useRef({ fetchedAt: 0, data: EMPTY_MERKLE_TREE });
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
   const [syncPending, setSyncPending] = useState(false);
+  const [rentalPricingModel, setRentalPricingModel] = useState({
+    loading: false,
+    dailyRewards: 0,
+    totalEffective: 0,
+    asOf: 0
+  });
 
   const getReadProvider = () => {
     if (!readProviderRef.current) {
@@ -874,6 +883,85 @@ React.useEffect(() => {
   // ToadzMarket on Coston2 doesn't have getAllActiveListings
   setMarketListings([]);
 }, []);
+
+  const loadRentalPricingModel = async () => {
+    if (rentalPricingInFlightRef.current) return;
+    rentalPricingInFlightRef.current = true;
+    setRentalPricingModel((prev) => ({ ...prev, loading: prev.asOf === 0 }));
+
+    try {
+      const readProvider = getReadProvider();
+      const stakeRead = new ethers.Contract(
+        CONTRACTS.ToadzStake,
+        [
+          'function totalEffectiveShares() view returns (uint256)',
+          'event RewardsDistributed(uint256 amount, uint256 newRewardIndex)'
+        ],
+        readProvider
+      );
+
+      const [latestBlock, totalEffectiveRaw] = await Promise.all([
+        readProvider.getBlock('latest'),
+        stakeRead.totalEffectiveShares().catch(() => 0n)
+      ]);
+
+      const latestNumber = Number(latestBlock?.number || 0);
+      let fromBlock = 0;
+      if (latestNumber > 0) {
+        const sampleBack = Math.min(RENTAL_MODEL_SAMPLE_BLOCKS, latestNumber);
+        const sampleBlock = await readProvider.getBlock(latestNumber - sampleBack).catch(() => null);
+        const latestTs = Number(latestBlock?.timestamp || 0);
+        const sampleTs = Number(sampleBlock?.timestamp || 0);
+        const secPerBlock = latestTs > sampleTs && sampleBack > 0
+          ? (latestTs - sampleTs) / sampleBack
+          : 2;
+        const blocks24h = Math.max(1, Math.ceil(86400 / Math.max(secPerBlock, 0.5)));
+        fromBlock = Math.max(0, latestNumber - blocks24h);
+      }
+
+      const rewardTopic = ethers.id('RewardsDistributed(uint256,uint256)');
+      const rewardLogs = await readProvider.getLogs({
+        address: CONTRACTS.ToadzStake,
+        fromBlock,
+        toBlock: latestNumber,
+        topics: [rewardTopic]
+      }).catch(() => []);
+
+      const rewardIface = new ethers.Interface([
+        'event RewardsDistributed(uint256 amount, uint256 newRewardIndex)'
+      ]);
+      let rewardSumRaw = 0n;
+      for (const log of rewardLogs) {
+        try {
+          const parsed = rewardIface.parseLog(log);
+          rewardSumRaw += BigInt(parsed.args.amount);
+        } catch (_) {
+          // Ignore malformed rows.
+        }
+      }
+
+      setRentalPricingModel({
+        loading: false,
+        dailyRewards: Number(ethers.formatEther(rewardSumRaw)),
+        totalEffective: Number(ethers.formatEther(totalEffectiveRaw)),
+        asOf: Date.now()
+      });
+    } catch (err) {
+      console.log('Failed to load rental pricing model:', err);
+      setRentalPricingModel((prev) => ({ ...prev, loading: false }));
+    } finally {
+      rentalPricingInFlightRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'mint') return;
+    loadRentalPricingModel();
+    const interval = setInterval(() => {
+      loadRentalPricingModel();
+    }, RENTAL_MODEL_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [activeTab, marketRefresh]);
   
   // Sync OG count from Songbird to Flare (calls backend)
 const syncToFlare = async () => {
@@ -2422,6 +2510,41 @@ useEffect(() => {
   const boostChartHeight = isDesktop ? 144 : 116;
   const boostBarMaxHeight = isDesktop ? 132 : 104;
 
+  const formatSignedPerDay = (value) => {
+    if (!Number.isFinite(value)) return '—';
+    const abs = Math.abs(value);
+    const sign = value >= 0 ? '+' : '-';
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}k`;
+    if (abs >= 1) return `${sign}${abs.toFixed(2)}`;
+    return `${sign}${abs.toFixed(4)}`;
+  };
+
+  const getRentalEstimateForListing = (listing) => {
+    if (!connected || !listing?.isRentOnly || !userPosition) return null;
+    if (rentalPricingModel.totalEffective <= 0 || rentalPricingModel.dailyRewards <= 0) return null;
+
+    const stakeFlr = Number(userPosition.wflrStaked || 0);
+    const lockMultiplier = Number(userPosition.lockMultiplier || 1);
+    if (stakeFlr <= 0 || lockMultiplier <= 0) return null;
+
+    const currentBoostPct = Number(boostData.boost || 0);
+    // Market listing boost is displayed as (1 + days/100)x, so add only the delta.
+    const listingBoostPct = Math.max(0, Math.min(4, Number(listing.commitmentDays || 0) / 100));
+    if (listingBoostPct <= 0) return null;
+
+    const weighted = stakeFlr * lockMultiplier;
+    const currentEffective = weighted * (1 + currentBoostPct);
+    const projectedEffective = weighted * (1 + currentBoostPct + listingBoostPct);
+    const extraEffective = Math.max(0, projectedEffective - currentEffective);
+    if (extraEffective <= 0) return null;
+
+    const extraPerDay = (rentalPricingModel.dailyRewards * extraEffective) / rentalPricingModel.totalEffective;
+    const rentPerDay = Number(listing.dailyRate || 0);
+    const netPerDay = extraPerDay - rentPerDay;
+
+    return { extraPerDay, rentPerDay, netPerDay };
+  };
+
   useEffect(() => {
     setPoolValuePulse((v) => v + 1);
   }, [fomoFlrExtra]);
@@ -3806,6 +3929,14 @@ useEffect(() => {
           ))}
         </div>
 
+        <div style={{ marginBottom: 12, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+          {rentalPricingModel.loading
+            ? 'Pricing model syncing...'
+            : rentalPricingModel.asOf > 0
+              ? `Estimates use last 24h rewards (${formatDisplayAmount(rentalPricingModel.dailyRewards, 4)} FLR/day pool-wide).`
+              : 'Pricing model unavailable.'}
+        </div>
+
         {/* Market Listings Table */}
         <div style={{
           background: 'rgba(255,255,255,0.02)',
@@ -3870,6 +4001,7 @@ useEffect(() => {
               const dailyRate = parseFloat(listing.dailyRate);
               const price = parseFloat(listing.price);
               const rank = rarityRanks ? (rarityRanks[parseInt(listing.tokenId) - 1] || 0) : 0;
+              const rentalEstimate = getRentalEstimateForListing(listing);
               
               // Check if rented (from contract or mock for demo)
               const isRented = listing.renter && listing.renter !== '0x0000000000000000000000000000000000000000';
@@ -3938,6 +4070,15 @@ useEffect(() => {
                         <>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR</div>
                           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>/day</div>
+                          {connected && (
+                            <div style={{
+                              fontSize: 9,
+                              color: rentalEstimate ? (rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b') : 'rgba(255,255,255,0.35)',
+                              marginTop: 2
+                            }}>
+                              {rentalEstimate ? `Est net ${formatSignedPerDay(rentalEstimate.netPerDay)} /d` : 'Est net —'}
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>—</div>
@@ -4152,6 +4293,20 @@ useEffect(() => {
                           <div style={{ textAlign: 'center', marginBottom: 12 }}>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR / day</div>
                             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Deducted from your staked LP</div>
+                            {connected && (
+                              <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                                {rentalEstimate ? (
+                                  <>
+                                    <div>Est extra: +{formatDisplayAmount(rentalEstimate.extraPerDay, 4)} FLR/day</div>
+                                    <div style={{ color: rentalEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b' }}>
+                                      Est net: {formatSignedPerDay(rentalEstimate.netPerDay)} FLR/day
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div>Estimates unavailable</div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <button 
                             onClick={() => { setSelectedRentalListing(listing); setShowBoostRentModal(true); }}
@@ -5337,6 +5492,7 @@ useEffect(() => {
     const dailyRate = parseFloat(listing.dailyRate);
     const boost = Math.min(5.0, 1 + listing.commitmentDays / 100);
     const nftImage = `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${listing.tokenId}.svg`;
+    const rentEstimate = getRentalEstimateForListing(listing);
 
     return (
       <div 
@@ -5409,6 +5565,31 @@ useEffect(() => {
             <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, color: '#00ff88' }}>{dailyRate < 1 ? dailyRate.toFixed(4) : dailyRate.toFixed(2)} FLR/day</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Deducted daily from your staked LP</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>No upfront payment required</div>
+            {connected && (
+              <div style={{
+                marginTop: 12,
+                background: 'rgba(0,0,0,0.25)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 8,
+                padding: 10,
+                textAlign: 'left'
+              }}>
+                {rentEstimate ? (
+                  <>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                      Est extra: <span style={{ color: '#00ff88', fontWeight: 700 }}>+{formatDisplayAmount(rentEstimate.extraPerDay, 4)} FLR/day</span>
+                    </div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: rentEstimate.netPerDay >= 0 ? '#00ff88' : '#ff6b6b' }}>
+                      Est net: <span style={{ fontWeight: 700 }}>{formatSignedPerDay(rentEstimate.netPerDay)} FLR/day</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                    Estimation unavailable (need active position + recent reward data)
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <button 
