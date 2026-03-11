@@ -1,6 +1,6 @@
 # Toadz Coston2 Dev Handoff
 
-Last updated: 2026-02-25
+Last updated: 2026-03-11
 
 ## 1) Environment
 - Frontend: Vite app in `/Users/dantian/toadz-coston/site`
@@ -116,6 +116,28 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - storage layout checks on upgrades
   - ProxyAdmin ownership/multisig verification
   - deployment/rollback runbook and monitoring alerts
+
+### Active Product TODO (Current)
+- Mainnet UI sync:
+  - carry over latest sandbox stake-card composition (`Est. APY` above `Earned`) once approved
+  - keep pool-capacity banner modal-only (not on unstaked panel)
+- Pool capacity UX:
+  - keep capacity details in `Add to Position` modal
+  - keep high-utilization tone yellow (no red warning style)
+- Weekly Bonus feature (NEW):
+  - source from seeded FLR delegation rewards only (seeded wallet yield)
+  - add separate accounting path for seeded principal vs pool principal
+  - route seeded-yield share to weekly bonus bucket
+  - Sunday distribution function + `Weekly Bonus` event category for inflow history
+  - implement/test on sandbox first, then mainnet
+- Dev seeding method (contract upgrade):
+  - add approved seeder role/wallet config including dev wallet
+  - allow seeding principal into stake system without consuming user pool cap
+  - preserve seeder principal withdrawal path (seed-only withdraw)
+  - ensure seeded rewards attribution is separate from user principal rewards
+  - test on sandbox + canary before any mainnet rollout
+- Legal pages:
+  - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
 ## 8) Useful Commands
 - Compile contracts:
