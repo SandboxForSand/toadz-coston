@@ -7478,20 +7478,9 @@ useEffect(() => {
               <div>
                 Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span>
               </div>
-              <div style={{
-                marginTop: 4,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 8px',
-                borderRadius: 999,
-                background: 'transparent',
-                border: '1px solid rgba(34, 197, 94, 0.65)'
-              }}>
-                <span style={{ fontSize: 10, color: 'rgba(34, 197, 94, 0.9)', textTransform: 'uppercase', letterSpacing: 0.35 }}>
-                  Est. APY
-                </span>
-                <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                Est. APY{' '}
+                <span style={{ color: '#22c55e', fontWeight: 600 }}>
                   {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
                 </span>
               </div>
