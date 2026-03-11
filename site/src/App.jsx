@@ -7485,13 +7485,13 @@ useEffect(() => {
                 gap: 6,
                 padding: '4px 8px',
                 borderRadius: 999,
-                background: 'rgba(80, 220, 255, 0.12)',
-                border: '1px solid rgba(80, 220, 255, 0.35)'
+                background: 'transparent',
+                border: '1px solid rgba(34, 197, 94, 0.65)'
               }}>
-                <span style={{ fontSize: 10, color: 'rgba(170,245,255,0.85)', textTransform: 'uppercase', letterSpacing: 0.35 }}>
-                  Projected APY at current rate
+                <span style={{ fontSize: 10, color: 'rgba(34, 197, 94, 0.9)', textTransform: 'uppercase', letterSpacing: 0.35 }}>
+                  Est. APY
                 </span>
-                <span style={{ fontSize: 12, color: '#aef6ff', fontWeight: 700 }}>
+                <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
                   {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
                 </span>
               </div>
