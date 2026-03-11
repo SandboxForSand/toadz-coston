@@ -139,11 +139,23 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
 - Market offers (new feature request):
   - add `Make Offer` flow on both `For Sale` and `Rent Only` listings
   - support buyer/renter offer submission from listing rows and modal views
+  - add unlisted offer market (no staking requirement to place offers):
+    - v1 criteria: `offer price` + `max rarity rank`
+    - fill condition: seller NFT rank must satisfy `rank <= max rarity rank`
+    - example criteria: `1000 FLR`, `Rank <= 50,000`
+  - offer book UX:
+    - columns: price, max rank, remaining qty, expiry, action
+    - connected-wallet match indicator (`N eligible`)
+    - fill modal shows eligible NFTs only (best-rank first)
   - define offer lifecycle: create, cancel, accept, expire
   - include anti-spam bounds (min offer, expiry window, optional offer fee/deposit)
   - decide settlement model:
     - sale offers settle in FLR at acceptance
     - rental offers settle as accepted daily rate + duration terms
+  - enforce sale fee split on all sale paths (listed + offer acceptance):
+    - `95%` to seller
+    - `5%` to stakers pro-rata
+    - emit inflow category/event label: `Tadz Sale`
   - implement/test on sandbox first before any mainnet rollout
 - Referrals QA + launch check:
   - run end-to-end referral flow tests (new user with ref, no-ref baseline, repeat actions)
