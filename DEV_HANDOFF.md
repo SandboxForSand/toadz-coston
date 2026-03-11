@@ -171,6 +171,18 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - ensure live contract lock tiers and UI labels match exactly
   - target canonical tiers: `90 days`, `180 days`, `365 days`
   - if contract differs, perform upgrade + frontend update together after sandbox validation
+- Progressive listing requirement ramp (for 250k cap target):
+  - move from flat per-slot requirement to per-wallet cumulative slot curve
+  - proposed cumulative thresholds:
+    - slot 1: `1,000 FLR`
+    - slot 2: `3,000 FLR`
+    - slot 3: `8,000 FLR`
+    - slot 4: `18,000 FLR`
+    - slot 5: `38,000 FLR`
+    - slot 6: `78,000 FLR`
+    - slot 7+: add `50,000 FLR` per additional slot
+  - enforce in contract (not UI-only) and mirror in listing modal copy
+  - sandbox validation first, then canary/mainnet rollout
 - Legal pages:
   - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
