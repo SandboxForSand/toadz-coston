@@ -2788,6 +2788,49 @@ useEffect(() => {
     topStakerPct: (poolStats.topStakerReturn || 0).toFixed(1)
   };
 
+  const poolCapacityInfo = (() => {
+    const cap = Number(poolInfo.cap || 0);
+    const current = Number(poolInfo.totalWflr || 0);
+    if (!Number.isFinite(cap) || cap <= 0) return null;
+
+    const usedPct = Math.max(0, (current / cap) * 100);
+    const remaining = Math.max(0, cap - current);
+
+    if (usedPct >= 95) {
+      return {
+        cap,
+        current,
+        usedPct,
+        remaining,
+        tone: '#ff7a7a',
+        border: 'rgba(255,122,122,0.35)',
+        bg: 'rgba(255,122,122,0.08)'
+      };
+    }
+
+    if (usedPct >= 80) {
+      return {
+        cap,
+        current,
+        usedPct,
+        remaining,
+        tone: '#fbbf24',
+        border: 'rgba(251,191,36,0.35)',
+        bg: 'rgba(251,191,36,0.08)'
+      };
+    }
+
+    return {
+      cap,
+      current,
+      usedPct,
+      remaining,
+      tone: 'rgba(255,255,255,0.75)',
+      border: 'rgba(255,255,255,0.16)',
+      bg: 'rgba(255,255,255,0.03)'
+    };
+  })();
+
   const currentPoolSharePct = poolInfo.totalWflr > 0 ? ((user.lpPosition / poolInfo.totalWflr) * 100) : 0;
   const projectedPositionFlr = user.lpPosition + fomoFlrExtra;
   const projectedPoolTotalFlr = poolInfo.totalWflr + fomoFlrExtra;
@@ -7239,6 +7282,22 @@ useEffect(() => {
               </div>
               
               {/* FLR Input */}
+              {poolCapacityInfo && (
+                <div style={{
+                  marginBottom: 12,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  border: `1px solid ${poolCapacityInfo.border}`,
+                  background: poolCapacityInfo.bg
+                }}>
+                  <div style={{ fontSize: 11, color: poolCapacityInfo.tone }}>
+                    Pool capacity: {formatDisplayAmount(poolCapacityInfo.current, 2)} / {formatDisplayAmount(poolCapacityInfo.cap, 2)} FLR ({poolCapacityInfo.usedPct.toFixed(1)}%)
+                  </div>
+                  <div style={{ fontSize: 11, color: poolCapacityInfo.tone, marginTop: 3 }}>
+                    Max you can add now: {formatDisplayAmount(poolCapacityInfo.remaining, 4)} FLR
+                  </div>
+                </div>
+              )}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>FLR to add</span>
@@ -7957,6 +8016,22 @@ useEffect(() => {
           padding: 16,
           marginBottom: 12
         }}>
+          {poolCapacityInfo && (
+            <div style={{
+              marginBottom: 12,
+              padding: '8px 10px',
+              borderRadius: 10,
+              border: `1px solid ${poolCapacityInfo.border}`,
+              background: poolCapacityInfo.bg
+            }}>
+              <div style={{ fontSize: 11, color: poolCapacityInfo.tone }}>
+                Pool capacity: {formatDisplayAmount(poolCapacityInfo.current, 2)} / {formatDisplayAmount(poolCapacityInfo.cap, 2)} FLR ({poolCapacityInfo.usedPct.toFixed(1)}%)
+              </div>
+              <div style={{ fontSize: 11, color: poolCapacityInfo.tone, marginTop: 3 }}>
+                Remaining room: {formatDisplayAmount(poolCapacityInfo.remaining, 4)} FLR
+              </div>
+            </div>
+          )}
           {/* FLR Input */}
           <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
