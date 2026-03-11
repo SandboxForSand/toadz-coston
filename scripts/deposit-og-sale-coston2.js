@@ -2,24 +2,50 @@ const { ethers } = require("hardhat");
 
 /**
  * Usage:
- *   npx hardhat run scripts/deposit-og-sale-coston2.js --network coston2 -- <sale> <collection> <idsCsv>
+ *   npx hardhat run scripts/deposit-og-sale-coston2.js --network coston2 -- <sale> <collection> <idsSpec>
  *
  * Example:
  *   npx hardhat run scripts/deposit-og-sale-coston2.js --network coston2 -- 0xSale 0xCollection 1,2,3,4
+ *   npx hardhat run scripts/deposit-og-sale-coston2.js --network coston2 -- 0xSale 0xCollection 1-100
  */
-async function main() {
-  const [deployer] = await ethers.getSigners();
-  const [saleAddress, collectionAddress, tokenCsv] = process.argv.slice(2);
-
-  if (!saleAddress || !collectionAddress || !tokenCsv) {
-    throw new Error("Missing args: <sale> <collection> <idsCsv>");
-  }
-
-  const tokenIds = tokenCsv
+function parseIds(spec) {
+  const out = [];
+  const parts = String(spec || "")
     .split(",")
     .map((v) => v.trim())
-    .filter(Boolean)
-    .map((v) => BigInt(v));
+    .filter(Boolean);
+
+  for (const part of parts) {
+    if (part.includes("-")) {
+      const [startRaw, endRaw] = part.split("-").map((v) => v.trim());
+      const start = Number(startRaw);
+      const end = Number(endRaw);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+        throw new Error(`Invalid range: ${part}`);
+      }
+      for (let tokenId = start; tokenId <= end; tokenId++) {
+        out.push(BigInt(tokenId));
+      }
+    } else {
+      const single = Number(part);
+      if (!Number.isFinite(single) || single <= 0) throw new Error(`Invalid token id: ${part}`);
+      out.push(BigInt(single));
+    }
+  }
+
+  return out;
+}
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  const [saleAddress, collectionAddress, tokenSpec] = process.argv.slice(2);
+  const batchSize = Number(process.env.OG_SALE_DEPOSIT_BATCH || "50");
+
+  if (!saleAddress || !collectionAddress || !tokenSpec) {
+    throw new Error("Missing args: <sale> <collection> <idsSpec>");
+  }
+
+  const tokenIds = parseIds(tokenSpec);
 
   if (tokenIds.length === 0) {
     throw new Error("No token ids parsed");
@@ -28,7 +54,8 @@ async function main() {
   console.log("Deployer:", deployer.address);
   console.log("Sale:", saleAddress);
   console.log("Collection:", collectionAddress);
-  console.log("Token IDs:", tokenIds.map(String).join(","));
+  console.log("Token IDs count:", tokenIds.length);
+  console.log("Batch size:", batchSize);
 
   const sale = await ethers.getContractAt(
     [
@@ -62,9 +89,12 @@ async function main() {
     }
   }
 
-  const tx = await sale.depositBatch(collectionAddress, tokenIds);
-  const receipt = await tx.wait();
-  console.log("depositBatch tx:", receipt.hash);
+  for (let i = 0; i < tokenIds.length; i += batchSize) {
+    const chunk = tokenIds.slice(i, i + batchSize);
+    const tx = await sale.depositBatch(collectionAddress, chunk);
+    const receipt = await tx.wait();
+    console.log(`depositBatch [${i + 1}-${Math.min(i + chunk.length, tokenIds.length)}] tx:`, receipt.hash);
+  }
 
   const inventory = await sale.inventoryCount(collectionAddress);
   console.log("Inventory now:", inventory.toString());
@@ -74,4 +104,3 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-
