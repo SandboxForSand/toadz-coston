@@ -195,6 +195,22 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
     - slot 7+: add `50,000 FLR` per additional slot
   - enforce in contract (not UI-only) and mirror in listing modal copy
   - sandbox validation first, then canary/mainnet rollout
+- Agent revenue track:
+  - phase 1 (non-custodial): signed-tx helper agents
+    - offer management agent (post/update/cancel offers by target rules)
+    - rental repricing agent (daily/weekly repricing policy)
+    - listing manager agent (bulk listing decisions by rank/boost targets)
+  - phase 2 (scoped automation): session-key or smart-account constrained actions
+    - strict spend/action limits
+    - expiry windows + kill switch
+  - monetization model:
+    - subscription tiers for automation
+    - optional execution fee on successful fills/rents
+  - trust and safety:
+    - no custody of user funds
+    - explicit per-action user approvals in v1
+    - full action logs and revoke controls in UI
+  - ship on sandbox first with one agent vertical (offers) before wider rollout
 - Legal pages:
   - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
