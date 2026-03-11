@@ -136,6 +136,15 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - preserve seeder principal withdrawal path (seed-only withdraw)
   - ensure seeded rewards attribution is separate from user principal rewards
   - test on sandbox + canary before any mainnet rollout
+- Market offers (new feature request):
+  - add `Make Offer` flow on both `For Sale` and `Rent Only` listings
+  - support buyer/renter offer submission from listing rows and modal views
+  - define offer lifecycle: create, cancel, accept, expire
+  - include anti-spam bounds (min offer, expiry window, optional offer fee/deposit)
+  - decide settlement model:
+    - sale offers settle in FLR at acceptance
+    - rental offers settle as accepted daily rate + duration terms
+  - implement/test on sandbox first before any mainnet rollout
 - Legal pages:
   - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
