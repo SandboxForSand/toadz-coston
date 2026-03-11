@@ -1,0 +1,17 @@
+{
+  "network": "coston2",
+  "chainId": 114,
+  "sale": "0x1B84f25483e8660738492ca07390AbCd7f43EeeC",
+  "treasury": "0x9bDB29529016a15754373B9D5B5116AB728E916e",
+  "deployedAt": "2026-03-11T13:52:27.593Z",
+  "configuredCollections": [
+    {
+      "name": "sToadz",
+      "address": "0x395ff0eA8B02e2eE261FFFDA8c6Df8e56512E04F",
+      "base": "5",
+      "step": "0.02",
+      "enabled": true
+    }
+  ],
+  "bundleDiscountBps": 1000
+}

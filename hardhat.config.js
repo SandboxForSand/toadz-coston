@@ -42,7 +42,7 @@ module.exports = {
     },
 
     coston2: {
-      url: "https://coston2-api.flare.network/ext/C/rpc",
+      url: process.env.COSTON2_RPC_URL || "https://coston2-api.flare.network/ext/C/rpc",
       chainId: 114,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     }

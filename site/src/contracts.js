@@ -6,6 +6,7 @@ export const CONTRACTS = {
   BoostRegistry: '0x958aEEC535974465109f8f3411fA576249bd06ef',
   ToadzStake: '0xd973E756fCcB640108aAf17B3465a387802A6E49',
   ToadzMarket: '0x58128c30cFAFCd8508bB03fc396c5a61FBC6Bf2F',
+  OGSale: '0x1B84f25483e8660738492ca07390AbCd7f43EeeC',
   Zap: '0xBeA2995513DCc193C39241E6Cd55AF53172a711E',
   OGVault: '0x812B7F96966b94C9ECa198ac0553840ACabbd18A',
   TadzClaimer: '0xdaE9CB4D6F686e31E12887a1C1c017Edf53e94B2',
@@ -122,6 +123,15 @@ export const ABIS = {
     'function listForRent(address collection, uint256 tokenId, uint256 dailyRate, uint256 commitmentDays) external',
     'function cancelRentalListing(address collection, uint256 tokenId) external',
     'function getRentalListing(address collection, uint256 tokenId) view returns (address owner, uint256 dailyRate, uint256 commitmentEnd, uint256 daysRemaining, bool isActive, bool isRented)',
+  ],
+
+  OGSale: [
+    'function getCollections() view returns (address[])',
+    'function getCollectionInfo(address collection) view returns (bool enabled, uint64 sold, uint256 inventory, uint128 basePriceWei, uint128 stepPriceWei)',
+    'function quoteCurrent(address collection) view returns (uint256)',
+    'function quoteBundle(address[] calldata bundleCollections) view returns (uint256 rawPrice, uint256 discountedPrice)',
+    'function buySingle(address collection, uint256 maxPrice) payable',
+    'function buyBundle(address[] calldata bundleCollections, uint256 maxPrice) payable',
   ],
   
   Buffer: [

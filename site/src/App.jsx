@@ -235,6 +235,16 @@ const ToadzFinal = () => {
     asOf: 0,
     source: 'none'
   });
+  const [showOgSaleModal, setShowOgSaleModal] = useState(false);
+  const [ogSaleLoading, setOgSaleLoading] = useState(false);
+  const [ogSaleBuying, setOgSaleBuying] = useState(false);
+  const [ogSaleData, setOgSaleData] = useState({
+    collections: [],
+    bundleCollections: [],
+    bundleRawWei: '0',
+    bundleDiscountedWei: '0',
+    error: ''
+  });
 
   const getReadProvider = () => {
     if (!readProviderRef.current) {
@@ -245,6 +255,164 @@ const ToadzFinal = () => {
 
   const getReadableError = (err) => {
     return err?.reason || err?.shortMessage || err?.data?.message || err?.message || 'Unknown error';
+  };
+
+  const getOgCollectionLabel = (collectionAddress) => {
+    const needle = String(collectionAddress || '').toLowerCase();
+    if (needle === String(CONTRACTS.TestOGCollection || '').toLowerCase()) return 'sToadz';
+    const known = (OG_COLLECTIONS || []).find((c) => String(c.address || '').toLowerCase() === needle);
+    if (known?.name) return known.name;
+    return `${needle.slice(0, 6)}...${needle.slice(-4)}`;
+  };
+
+  const loadOgSaleData = async () => {
+    if (!CONTRACTS.OGSale) {
+      setOgSaleData({
+        collections: [],
+        bundleCollections: [],
+        bundleRawWei: '0',
+        bundleDiscountedWei: '0',
+        error: 'OG sale contract not configured yet'
+      });
+      return;
+    }
+
+    setOgSaleLoading(true);
+    try {
+      const readProvider = getReadProvider();
+      const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, readProvider);
+      const collectionAddresses = await sale.getCollections();
+
+      const rows = [];
+      for (const collectionAddress of collectionAddresses) {
+        const info = await sale.getCollectionInfo(collectionAddress);
+        const currentPriceWei = await sale.quoteCurrent(collectionAddress).catch(() => 0n);
+        rows.push({
+          address: collectionAddress,
+          label: getOgCollectionLabel(collectionAddress),
+          enabled: Boolean(info.enabled),
+          sold: Number(info.sold || 0),
+          inventory: Number(info.inventory || 0),
+          basePrice: Number(ethers.formatEther(info.basePriceWei || 0n)),
+          stepPrice: Number(ethers.formatEther(info.stepPriceWei || 0n)),
+          currentPrice: Number(ethers.formatEther(currentPriceWei)),
+          currentPriceWei: currentPriceWei.toString()
+        });
+      }
+
+      const bundleCollections = rows
+        .filter((row) => row.enabled && row.inventory > 0)
+        .map((row) => row.address);
+
+      let bundleRawWei = '0';
+      let bundleDiscountedWei = '0';
+      if (bundleCollections.length >= 2) {
+        const bundleQuote = await sale.quoteBundle(bundleCollections);
+        bundleRawWei = bundleQuote.rawPrice.toString();
+        bundleDiscountedWei = bundleQuote.discountedPrice.toString();
+      }
+
+      setOgSaleData({
+        collections: rows,
+        bundleCollections,
+        bundleRawWei,
+        bundleDiscountedWei,
+        error: ''
+      });
+    } catch (err) {
+      setOgSaleData({
+        collections: [],
+        bundleCollections: [],
+        bundleRawWei: '0',
+        bundleDiscountedWei: '0',
+        error: getReadableError(err)
+      });
+    } finally {
+      setOgSaleLoading(false);
+    }
+  };
+
+  const handleBuyOgSingle = async (collectionAddress, priceWeiString) => {
+    if (!window.ethereum) {
+      showToast('error', 'Wallet not found');
+      return;
+    }
+    if (!CONTRACTS.OGSale) {
+      showToast('error', 'OG sale not configured');
+      return;
+    }
+
+    setOgSaleBuying(true);
+    try {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== COSTON2_CHAIN.chainId) {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: COSTON2_CHAIN.chainId }]
+        });
+      }
+
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const web3Signer = await web3Provider.getSigner();
+      const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, web3Signer);
+
+      const priceWei = BigInt(priceWeiString);
+      const maxPrice = priceWei + (priceWei * 300n) / 10_000n; // 3% slippage buffer.
+      const tx = await sale.buySingle(collectionAddress, maxPrice, { value: maxPrice });
+      await tx.wait();
+
+      showToast('success', 'OG purchased');
+      await loadOgSaleData();
+      if (walletAddress) await loadUserData(walletAddress, contracts);
+    } catch (err) {
+      showToast('error', `Buy failed: ${getReadableError(err)}`);
+    } finally {
+      setOgSaleBuying(false);
+    }
+  };
+
+  const handleBuyOgBundle = async () => {
+    if (!window.ethereum) {
+      showToast('error', 'Wallet not found');
+      return;
+    }
+    if (!CONTRACTS.OGSale) {
+      showToast('error', 'OG sale not configured');
+      return;
+    }
+    if (!ogSaleData.bundleCollections || ogSaleData.bundleCollections.length < 2) {
+      showToast('error', 'Bundle unavailable');
+      return;
+    }
+
+    setOgSaleBuying(true);
+    try {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== COSTON2_CHAIN.chainId) {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: COSTON2_CHAIN.chainId }]
+        });
+      }
+
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      const web3Signer = await web3Provider.getSigner();
+      const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, web3Signer);
+
+      const [, discountedPrice] = await sale.quoteBundle(ogSaleData.bundleCollections);
+      const maxPrice = discountedPrice + (discountedPrice * 300n) / 10_000n; // 3% slippage buffer.
+
+      const tx = await sale.buyBundle(ogSaleData.bundleCollections, maxPrice, { value: maxPrice });
+      await tx.wait();
+
+      showToast('success', 'Bundle purchased');
+      await loadOgSaleData();
+      if (walletAddress) await loadUserData(walletAddress, contracts);
+    } catch (err) {
+      showToast('error', `Bundle failed: ${getReadableError(err)}`);
+    } finally {
+      setOgSaleBuying(false);
+    }
   };
 
   const loadMerkleTreeSnapshot = async (force = false) => {
@@ -6653,26 +6821,186 @@ useEffect(() => {
               textAlign: 'center'
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Need more OGs?</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>Buy on secondary to increase your rewards</div>
-              <a 
-                href="https://xhaven.io" 
-                target="_blank" 
-                rel="noopener noreferrer"
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
+                Buy OGs directly with FLR from protocol inventory
+              </div>
+              <button
+                onClick={async () => {
+                  setShowOgSaleModal(true);
+                  await loadOgSaleData();
+                }}
                 style={{
                   display: 'inline-block',
                   padding: '12px 24px',
                   background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                  border: 'none',
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 700,
                   color: 'white',
-                  textDecoration: 'none',
                   cursor: 'pointer'
                 }}
               >
-                Browse xHaven
-              </a>
+                Buy OGs
+              </button>
             </div>
+
+            {showOgSaleModal && (
+              <div
+                onClick={() => setShowOgSaleModal(false)}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.85)',
+                  zIndex: 1200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 20
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: '100%',
+                    maxWidth: 460,
+                    maxHeight: '85vh',
+                    overflowY: 'auto',
+                    background: '#0d0d12',
+                    border: '1px solid rgba(168,85,247,0.25)',
+                    borderRadius: 16,
+                    padding: 20
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800 }}>Buy OG NFTs</div>
+                    <button
+                      onClick={() => setShowOgSaleModal(false)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: 'rgba(255,255,255,0.65)',
+                        cursor: 'pointer'
+                      }}
+                    >×</button>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
+                    Testnet preview: choose a collection or buy bundle (10% off curve total).
+                  </div>
+
+                  {ogSaleLoading ? (
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Loading sale inventory...</div>
+                  ) : ogSaleData.error ? (
+                    <div style={{
+                      fontSize: 12,
+                      color: '#ff9a9a',
+                      background: 'rgba(255,80,80,0.08)',
+                      border: '1px solid rgba(255,80,80,0.22)',
+                      borderRadius: 10,
+                      padding: 10
+                    }}>
+                      {ogSaleData.error}
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {ogSaleData.collections.map((row) => {
+                          const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying;
+                          return (
+                            <div
+                              key={row.address}
+                              style={{
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: 10,
+                                padding: 12,
+                                background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(0,255,136,0.05)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <div style={{ fontSize: 14, fontWeight: 700 }}>{row.label}</div>
+                                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                                    Inventory {row.inventory} • Sold {row.sold}
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: '#00ff88' }}>
+                                    {row.currentPrice.toFixed(3)} FLR
+                                  </div>
+                                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>current curve price</div>
+                                </div>
+                              </div>
+                              <button
+                                disabled={disabled}
+                                onClick={() => handleBuyOgSingle(row.address, row.currentPriceWei)}
+                                style={{
+                                  width: '100%',
+                                  marginTop: 10,
+                                  borderRadius: 8,
+                                  border: disabled ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                                  background: disabled ? 'rgba(255,255,255,0.08)' : '#00ff88',
+                                  color: disabled ? 'rgba(255,255,255,0.45)' : '#000',
+                                  padding: '10px 12px',
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: disabled ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                {row.inventory <= 0 ? 'Sold out' : (!row.enabled ? 'Disabled' : 'Buy 1')}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div style={{
+                        marginTop: 14,
+                        border: '1px solid rgba(168,85,247,0.25)',
+                        borderRadius: 10,
+                        padding: 12,
+                        background: 'rgba(168,85,247,0.07)'
+                      }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Bundle (1 from each enabled collection)</div>
+                        {ogSaleData.bundleCollections.length >= 2 ? (
+                          <>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>
+                              Curve total: {Number(ethers.formatEther(ogSaleData.bundleRawWei)).toFixed(3)} FLR
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88', marginBottom: 10 }}>
+                              Bundle price (10% off): {Number(ethers.formatEther(ogSaleData.bundleDiscountedWei)).toFixed(3)} FLR
+                            </div>
+                            <button
+                              disabled={ogSaleBuying}
+                              onClick={handleBuyOgBundle}
+                              style={{
+                                width: '100%',
+                                borderRadius: 8,
+                                border: ogSaleBuying ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                                background: ogSaleBuying ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                color: '#fff',
+                                padding: '10px 12px',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: ogSaleBuying ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {ogSaleBuying ? 'Processing...' : 'Buy Bundle'}
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                            Bundle unavailable until at least 2 enabled collections have inventory.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
