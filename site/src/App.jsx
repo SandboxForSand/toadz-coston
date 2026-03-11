@@ -23,6 +23,7 @@ const TADZ_COLLECTION_ADDRESS = String(
 ).toLowerCase();
 const BOOST_NFT_FETCH_CHUNK = 30;
 const BOOST_NFT_CACHE_TTL_MS = 5 * 60 * 1000;
+const OG_LOCK_BATCH_SIZE = 40;
 const RENTAL_MODEL_REFRESH_MS = 5 * 60 * 1000;
 const RENTAL_MODEL_SAMPLE_BLOCKS = 2000;
 const RENTAL_MODEL_FALLBACK_DAILY_FLR = 12;
@@ -127,6 +128,14 @@ const ToadzFinal = () => {
   const [unstakeNftModal, setUnstakeNftModal] = useState(null);
   const [lockInfoModal, setLockInfoModal] = useState(null); // 'toadz' | 'discount' | 'rental'
   const [selectedNfts, setSelectedNfts] = useState([]);
+  const [ogLockProgress, setOgLockProgress] = useState({
+    active: false,
+    processed: 0,
+    totalNfts: 0,
+    currentBatch: 0,
+    totalBatches: 0,
+    currentCollection: ''
+  });
   
   // UI state
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -2367,25 +2376,89 @@ useEffect(() => {
         const collection = String(item.collection || '').toLowerCase();
         const tokenId = Number(item.tokenId);
         if (!collection || !Number.isFinite(tokenId) || tokenId <= 0) continue;
-        if (!byCollection.has(collection)) byCollection.set(collection, []);
-        byCollection.get(collection).push(tokenId);
+        if (!byCollection.has(collection)) byCollection.set(collection, new Set());
+        byCollection.get(collection).add(tokenId);
       }
 
-      for (const [collection, tokenIds] of byCollection.entries()) {
+      let totalNfts = 0;
+      let totalBatches = 0;
+      for (const tokenIdSet of byCollection.values()) {
+        const count = tokenIdSet.size;
+        totalNfts += count;
+        totalBatches += Math.max(1, Math.ceil(count / OG_LOCK_BATCH_SIZE));
+      }
+
+      if (totalNfts === 0) {
+        showToast('error', 'No valid NFT selections found to lock.');
+        return false;
+      }
+
+      let processed = 0;
+      let batchNumber = 0;
+      setOgLockProgress({
+        active: true,
+        processed: 0,
+        totalNfts,
+        currentBatch: 0,
+        totalBatches,
+        currentCollection: ''
+      });
+
+      for (const [collection, tokenIdSet] of byCollection.entries()) {
+        const tokenIds = Array.from(tokenIdSet.values()).sort((a, b) => a - b);
+        const collectionLabel = getOgCollectionLabel(collection);
+
         const nftContract = new ethers.Contract(collection, ABIS.ERC721, signer);
         const approved = await nftContract.isApprovedForAll(walletAddress, CONTRACTS.OGVault);
         if (!approved) {
-          const approveTx = await nftContract.setApprovalForAll(CONTRACTS.OGVault, true, { gasLimit: 800000 });
+          setOgLockProgress((prev) => ({
+            ...prev,
+            active: true,
+            currentCollection: `${collectionLabel} approval`
+          }));
+          const approveTx = await nftContract.setApprovalForAll(CONTRACTS.OGVault, true, { gasLimit: 900000 });
           await approveTx.wait();
         }
 
-        const tx = tokenIds.length === 1
-          ? await ogVault.lock(collection, tokenIds[0], { gasLimit: 800000 })
-          : await ogVault.lockBatch(collection, tokenIds, { gasLimit: 3000000 });
-        await tx.wait();
+        for (let i = 0; i < tokenIds.length; i += OG_LOCK_BATCH_SIZE) {
+          const batchTokenIds = tokenIds.slice(i, i + OG_LOCK_BATCH_SIZE);
+          batchNumber += 1;
+
+          setOgLockProgress((prev) => ({
+            ...prev,
+            active: true,
+            currentBatch: batchNumber,
+            currentCollection: collectionLabel
+          }));
+
+          let tx;
+          if (batchTokenIds.length === 1) {
+            let gasLimit = 850000n;
+            try {
+              const estimatedGas = await ogVault.lock.estimateGas(collection, batchTokenIds[0]);
+              gasLimit = (estimatedGas * 130n) / 100n + 50000n;
+            } catch (_) {}
+            tx = await ogVault.lock(collection, batchTokenIds[0], { gasLimit });
+          } else {
+            let gasLimit = 3200000n;
+            try {
+              const estimatedGas = await ogVault.lockBatch.estimateGas(collection, batchTokenIds);
+              gasLimit = (estimatedGas * 125n) / 100n + 100000n;
+            } catch (_) {}
+            tx = await ogVault.lockBatch(collection, batchTokenIds, { gasLimit });
+          }
+
+          await tx.wait();
+          processed += batchTokenIds.length;
+          setOgLockProgress((prev) => ({
+            ...prev,
+            active: true,
+            processed
+          }));
+        }
       }
 
-      showToast('success', `Locked ${nftsToLock.length} OG NFT${nftsToLock.length === 1 ? '' : 's'}`);
+      showToast('success', `Locked ${totalNfts} OG NFT${totalNfts === 1 ? '' : 's'}`);
       await loadUserData(walletAddress, contracts);
       return true;
     } catch (err) {
@@ -2393,6 +2466,14 @@ useEffect(() => {
       showToast('error', 'Lock failed: ' + getReadableError(err));
       return false;
     } finally {
+      setOgLockProgress({
+        active: false,
+        processed: 0,
+        totalNfts: 0,
+        currentBatch: 0,
+        totalBatches: 0,
+        currentCollection: ''
+      });
       setLoading(false);
     }
   };
@@ -10325,7 +10406,10 @@ useEffect(() => {
       {/* Stake NFT Modal */}
       {stakeNftModal && (
         <div 
-          onClick={() => setStakeNftModal(null)}
+          onClick={() => {
+            if (loading) return;
+            setStakeNftModal(null);
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -10578,19 +10662,37 @@ useEffect(() => {
                 cursor: selectedNfts.length > 0 && !loading ? 'pointer' : 'default',
                 marginBottom: 12
               }}
-            >{loading ? 'Processing...' : `${stakeNftModal.type === 'og' ? 'Lock' : 'Stake'} ${selectedNfts.length > 0 ? selectedNfts.length : ''} Selected`}</button>
+            >{loading
+              ? (stakeNftModal.type === 'og' && ogLockProgress.active
+                ? `Locking batch ${Math.max(ogLockProgress.currentBatch, 1)}/${Math.max(ogLockProgress.totalBatches, 1)}...`
+                : 'Processing...')
+              : `${stakeNftModal.type === 'og' ? 'Lock' : 'Stake'} ${selectedNfts.length > 0 ? selectedNfts.length : ''} Selected`}</button>
+
+            {loading && stakeNftModal.type === 'og' && ogLockProgress.active && (
+              <div style={{
+                marginBottom: 12,
+                fontSize: 12,
+                color: 'rgba(255,255,255,0.65)',
+                textAlign: 'center',
+                lineHeight: 1.5
+              }}>
+                {`Processed ${ogLockProgress.processed}/${ogLockProgress.totalNfts} NFTs`}
+                {ogLockProgress.currentCollection ? ` • ${ogLockProgress.currentCollection}` : ''}
+              </div>
+            )}
 
             <button 
               onClick={() => setStakeNftModal(null)}
+              disabled={loading}
               style={{
                 width: '100%',
                 background: 'transparent',
-                color: 'rgba(255,255,255,0.4)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                color: loading ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.4)',
+                border: loading ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 12,
                 padding: '14px',
                 fontSize: 13,
-                cursor: 'pointer'
+                cursor: loading ? 'default' : 'pointer'
               }}
             >Cancel</button>
           </div>
