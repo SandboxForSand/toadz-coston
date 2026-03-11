@@ -2802,9 +2802,9 @@ useEffect(() => {
         current,
         usedPct,
         remaining,
-        tone: '#ff7a7a',
-        border: 'rgba(255,122,122,0.35)',
-        bg: 'rgba(255,122,122,0.08)'
+        tone: '#fbbf24',
+        border: 'rgba(251,191,36,0.45)',
+        bg: 'rgba(251,191,36,0.12)'
       };
     }
 
@@ -2814,9 +2814,9 @@ useEffect(() => {
         current,
         usedPct,
         remaining,
-        tone: '#fbbf24',
-        border: 'rgba(251,191,36,0.35)',
-        bg: 'rgba(251,191,36,0.08)'
+        tone: '#fcd34d',
+        border: 'rgba(252,211,77,0.35)',
+        bg: 'rgba(252,211,77,0.10)'
       };
     }
 
@@ -7940,7 +7940,7 @@ useEffect(() => {
         )}
 
         {/* Stake - only show for new users OR if no position */}
-        {user.lpPosition === 0 && (
+        {((!connected) || userPosition !== null) && user.lpPosition === 0 && (
         <>
         {/* Platform Stats Hero */}
         <div style={{
@@ -8016,22 +8016,6 @@ useEffect(() => {
           padding: 16,
           marginBottom: 12
         }}>
-          {poolCapacityInfo && (
-            <div style={{
-              marginBottom: 12,
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: `1px solid ${poolCapacityInfo.border}`,
-              background: poolCapacityInfo.bg
-            }}>
-              <div style={{ fontSize: 11, color: poolCapacityInfo.tone }}>
-                Pool capacity: {formatDisplayAmount(poolCapacityInfo.current, 2)} / {formatDisplayAmount(poolCapacityInfo.cap, 2)} FLR ({poolCapacityInfo.usedPct.toFixed(1)}%)
-              </div>
-              <div style={{ fontSize: 11, color: poolCapacityInfo.tone, marginTop: 3 }}>
-                Remaining room: {formatDisplayAmount(poolCapacityInfo.remaining, 4)} FLR
-              </div>
-            </div>
-          )}
           {/* FLR Input */}
           <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
