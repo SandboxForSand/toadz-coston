@@ -2732,6 +2732,57 @@ useEffect(() => {
     const days = Math.max(1, Math.ceil(secondsRemaining / 86400));
     return `${days} day${days === 1 ? '' : 's'}`;
   })();
+
+  const projectedApy = (() => {
+    if (user.lpPosition <= 0 || poolStats.totalWflr <= 0 || inflowHistory.length === 0) {
+      return null;
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const trailingWindowSec = 7 * 24 * 60 * 60; // 7 days
+    const positiveEvents = inflowHistory
+      .filter((item) =>
+        Number.isFinite(item?.amountFlr) &&
+        item.amountFlr > 0 &&
+        Number.isFinite(item?.timestamp) &&
+        item.timestamp > 0
+      );
+
+    if (positiveEvents.length === 0) return null;
+
+    const trailingEvents = positiveEvents.filter((item) => item.timestamp >= nowSec - trailingWindowSec);
+    const sampleEvents = trailingEvents.length >= 2 ? trailingEvents : positiveEvents;
+    const sorted = [...sampleEvents].sort((a, b) => a.timestamp - b.timestamp);
+    if (sorted.length === 0) return null;
+
+    const totalPoolInflows = sorted.reduce((sum, item) => sum + item.amountFlr, 0);
+    if (totalPoolInflows <= 0) return null;
+
+    const oldestTs = sorted[0].timestamp;
+    const newestTs = sorted[sorted.length - 1].timestamp;
+    const observedSec = Math.max(3600, Math.max(newestTs - oldestTs, nowSec - oldestTs)); // minimum 1 hour
+
+    const annualizedPoolInflows = totalPoolInflows * (365 * 24 * 60 * 60 / observedSec);
+    const userShare = Math.max(0, Math.min(1, user.lpPosition / poolStats.totalWflr));
+    const annualizedUserInflows = annualizedPoolInflows * userShare;
+    const basePosition = Math.max(user.totalPosition, user.totalDeposited, 0);
+    if (basePosition <= 0) return null;
+
+    const apyPct = (annualizedUserInflows / basePosition) * 100;
+    if (!Number.isFinite(apyPct) || apyPct < 0) return null;
+
+    let sampleLabel = `${sorted.length} event${sorted.length === 1 ? '' : 's'}`;
+    if (observedSec >= 86400) {
+      sampleLabel = `${Math.max(1, Math.round(observedSec / 86400))}d sample`;
+    } else {
+      sampleLabel = `${Math.max(1, Math.round(observedSec / 3600))}h sample`;
+    }
+
+    return {
+      apyPct: Math.min(apyPct, 99999),
+      sampleLabel
+    };
+  })();
   
   // Pool info - real contract data only
   const poolInfo = {
@@ -7435,6 +7486,15 @@ useEffect(() => {
                   Pool size <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(poolInfo.totalWflr)} / {formatDisplayAmount(poolInfo.cap)} FLR</span>
                 </div>
               )}
+              <div style={{ marginTop: 4 }}>
+                Projected APY (est.){' '}
+                <span style={{ color: '#fff', fontWeight: 600 }}>
+                  {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
+                </span>
+                {projectedApy?.sampleLabel ? (
+                  <span style={{ color: 'rgba(255,255,255,0.35)' }}> ({projectedApy.sampleLabel})</span>
+                ) : null}
+              </div>
             </div>
             <div style={{ textAlign: 'right' }}>Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span></div>
           </div>
