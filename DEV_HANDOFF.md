@@ -158,6 +158,19 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
   - support bundles with base discount (10%) and optional progressive discount tiers
   - define discount guardrails so volume incentives do not break revenue goals
   - target inventory offload campaign toward $100k-$200k+ equivalent raise
+- Boost UX + accounting alignment:
+  - remove frontend hard cap on `Your Boost` display (currently visually capped at `5x`)
+  - display real boost even when above `5x`
+  - add user-facing boost composition summary with source breakdown:
+    - lock period
+    - OGs locked/staked
+    - Tadz listed
+    - Tadz rented
+  - show total boost and additive components clearly in one place
+- Lock period parity (contract + UI):
+  - ensure live contract lock tiers and UI labels match exactly
+  - target canonical tiers: `90 days`, `180 days`, `365 days`
+  - if contract differs, perform upgrade + frontend update together after sandbox validation
 - Legal pages:
   - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
