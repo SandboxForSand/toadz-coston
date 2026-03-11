@@ -7470,12 +7470,7 @@ useEffect(() => {
               <div style={{ marginTop: 4 }}>POND Position <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(user.pondStaked)} POND</span></div>
               {positionTimeRemaining && (
                 <div style={{ marginTop: 4 }}>
-                  Time remaining <span style={{ color: '#fff', fontWeight: 600 }}>{positionTimeRemaining}</span>
-                </div>
-              )}
-              {poolInfo.cap > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  Pool size <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(poolInfo.totalWflr)} / {formatDisplayAmount(poolInfo.cap)} FLR</span>
+                  Lock <span style={{ color: '#fff', fontWeight: 600 }}>{positionTimeRemaining} left</span>
                 </div>
               )}
             </div>
@@ -7483,8 +7478,8 @@ useEffect(() => {
               <div>
                 Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span>
               </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                Est. APY{' '}
+              <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                APY est.{' '}
                 <span style={{ color: '#fff', fontWeight: 600 }}>
                   {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
                 </span>
