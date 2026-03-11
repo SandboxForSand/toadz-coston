@@ -6284,6 +6284,16 @@ useEffect(() => {
     
     // 3D Toadz airdrop: 3 per 1 locked
     const toadz3dEarned = ogLockedCount * 3;
+    const sToadzLockedCount = (() => {
+      const sToadzCollection = ogCollections.find((c) => {
+        const name = String(c?.name || '').toLowerCase();
+        return name.includes('stoadz') || name === 'toadz' || name.includes('test og');
+      });
+      if (sToadzCollection) return Number(sToadzCollection.locked || 0);
+      if (ogCollections.length === 1) return Number(ogCollections[0]?.locked || 0);
+      return 0;
+    })();
+    const toadz3dPreviewCount = Math.floor(sToadzLockedCount / 3);
     
     // Available to lock
     const availableToLock = ogCollections.reduce((sum, c) => sum + (c.availableTokenIds?.length || 0), 0);
@@ -6300,6 +6310,9 @@ useEffect(() => {
             letterSpacing: -1
           }}>Lock</h1>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Permanent utility for OG holders</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', marginTop: 6 }}>
+            Permanent lock: once locked, OG NFTs cannot be unlocked by users.
+          </div>
         </div>
 
         {/* Boost Sync Status - shows while syncing */}
@@ -6583,7 +6596,8 @@ useEffect(() => {
                     </svg>
                   </div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>3D Toadz</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#a855f7' }}>{Math.floor(ogLockedCount / 3)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#a855f7' }}>{toadz3dPreviewCount}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>from sToadz lock</div>
                 </div>
                 {/* Mint Discount Card */}
                 <div 
