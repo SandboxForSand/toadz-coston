@@ -145,6 +145,19 @@ Main frontend file: `/Users/dantian/toadz-coston/site/src/App.jsx`
     - sale offers settle in FLR at acceptance
     - rental offers settle as accepted daily rate + duration terms
   - implement/test on sandbox first before any mainnet rollout
+- Referrals QA + launch check:
+  - run end-to-end referral flow tests (new user with ref, no-ref baseline, repeat actions)
+  - verify attribution, payout amounts, and on-chain/accounting parity
+  - add admin troubleshooting checklist for referral disputes
+- Rental pricing finalization:
+  - finalize pricing method + copy in listing/rent modals
+  - validate with sandbox data and edge cases (low/no rewards periods)
+  - once approved, push finalized rental pricing UI/logic to mainnet frontend
+- OG direct sales (protocol inventory) expansion:
+  - support individual buys by collection
+  - support bundles with base discount (10%) and optional progressive discount tiers
+  - define discount guardrails so volume incentives do not break revenue goals
+  - target inventory offload campaign toward $100k-$200k+ equivalent raise
 - Legal pages:
   - add baseline `Terms of Service` and `Privacy Policy` routes/pages for production launch
 
