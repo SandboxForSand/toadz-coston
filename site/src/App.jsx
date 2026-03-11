@@ -7475,14 +7475,14 @@ useEffect(() => {
               )}
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div>
-                Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span>
-              </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
                 Est. APY{' '}
                 <span style={{ color: '#22c55e', fontWeight: 600 }}>
                   {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
                 </span>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span>
               </div>
             </div>
           </div>
