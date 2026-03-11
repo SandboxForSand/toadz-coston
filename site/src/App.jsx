@@ -2771,16 +2771,8 @@ useEffect(() => {
     const apyPct = (annualizedUserInflows / basePosition) * 100;
     if (!Number.isFinite(apyPct) || apyPct < 0) return null;
 
-    let sampleLabel = `${sorted.length} event${sorted.length === 1 ? '' : 's'}`;
-    if (observedSec >= 86400) {
-      sampleLabel = `${Math.max(1, Math.round(observedSec / 86400))}d sample`;
-    } else {
-      sampleLabel = `${Math.max(1, Math.round(observedSec / 3600))}h sample`;
-    }
-
     return {
-      apyPct: Math.min(apyPct, 99999),
-      sampleLabel
+      apyPct: Math.min(apyPct, 99999)
     };
   })();
   
@@ -7486,17 +7478,18 @@ useEffect(() => {
                   Pool size <span style={{ color: '#fff', fontWeight: 600 }}>{formatDisplayAmount(poolInfo.totalWflr)} / {formatDisplayAmount(poolInfo.cap)} FLR</span>
                 </div>
               )}
-              <div style={{ marginTop: 4 }}>
-                Projected APY (est.){' '}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div>
+                Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                Est. APY{' '}
                 <span style={{ color: '#fff', fontWeight: 600 }}>
                   {projectedApy ? `${projectedApy.apyPct.toFixed(1)}%` : '—'}
                 </span>
-                {projectedApy?.sampleLabel ? (
-                  <span style={{ color: 'rgba(255,255,255,0.35)' }}> ({projectedApy.sampleLabel})</span>
-                ) : null}
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>Earned <span style={{ color: '#00ff88', fontWeight: 600 }}>+{formatDisplayAmount(user.totalEarned)} FLR</span></div>
           </div>
         </div>
         )}
