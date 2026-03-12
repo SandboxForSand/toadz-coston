@@ -252,6 +252,16 @@ const ToadzFinal = () => {
     bundleCollections: [],
     bundleRawWei: '0',
     bundleDiscountedWei: '0',
+    bundleDiscountBps: 1000,
+    error: ''
+  });
+  const [ogSaleCart, setOgSaleCart] = useState({});
+  const [ogSaleQuote, setOgSaleQuote] = useState({
+    loading: false,
+    count: 0,
+    rawWei: '0',
+    discountedWei: '0',
+    discountBps: 1000,
     error: ''
   });
 
@@ -281,6 +291,7 @@ const ToadzFinal = () => {
         bundleCollections: [],
         bundleRawWei: '0',
         bundleDiscountedWei: '0',
+        bundleDiscountBps: 1000,
         error: 'OG sale contract not configured yet'
       });
       return;
@@ -315,6 +326,8 @@ const ToadzFinal = () => {
 
       let bundleRawWei = '0';
       let bundleDiscountedWei = '0';
+      let bundleDiscountBps = 1000;
+      bundleDiscountBps = Number(await sale.bundleDiscountBps().catch(() => 1000));
       if (bundleCollections.length >= 2) {
         const bundleQuote = await sale.quoteBundle(bundleCollections);
         bundleRawWei = bundleQuote.rawPrice.toString();
@@ -326,14 +339,17 @@ const ToadzFinal = () => {
         bundleCollections,
         bundleRawWei,
         bundleDiscountedWei,
+        bundleDiscountBps,
         error: ''
       });
+      setOgSaleCart({});
     } catch (err) {
       setOgSaleData({
         collections: [],
         bundleCollections: [],
         bundleRawWei: '0',
         bundleDiscountedWei: '0',
+        bundleDiscountBps: 1000,
         error: getReadableError(err)
       });
     } finally {
@@ -341,46 +357,123 @@ const ToadzFinal = () => {
     }
   };
 
-  const handleBuyOgSingle = async (collectionAddress, priceWeiString) => {
-    if (!window.ethereum) {
-      showToast('error', 'Wallet not found');
-      return;
+  const buildOgSaleCartCollections = () => {
+    const expanded = [];
+    for (const row of ogSaleData.collections) {
+      const rawQty = Number(ogSaleCart[row.address] || 0);
+      const qty = Math.max(0, Math.min(Number(row.inventory || 0), Math.floor(rawQty)));
+      for (let i = 0; i < qty; i++) expanded.push(row.address);
     }
-    if (!CONTRACTS.OGSale) {
-      showToast('error', 'OG sale not configured');
-      return;
-    }
-
-    setOgSaleBuying(true);
-    try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== COSTON2_CHAIN.chainId) {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: COSTON2_CHAIN.chainId }]
-        });
-      }
-
-      const web3Provider = new ethers.BrowserProvider(window.ethereum);
-      const web3Signer = await web3Provider.getSigner();
-      const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, web3Signer);
-
-      const priceWei = BigInt(priceWeiString);
-      const maxPrice = priceWei + (priceWei * 300n) / 10_000n; // 3% slippage buffer.
-      const tx = await sale.buySingle(collectionAddress, maxPrice, { value: maxPrice });
-      await tx.wait();
-
-      showToast('success', 'OG purchased');
-      await loadOgSaleData();
-      if (walletAddress) await loadUserData(walletAddress, contracts);
-    } catch (err) {
-      showToast('error', `Buy failed: ${getReadableError(err)}`);
-    } finally {
-      setOgSaleBuying(false);
-    }
+    return expanded;
   };
 
-  const handleBuyOgBundle = async () => {
+  const setOgSaleCartQty = (collectionAddress, nextQty, inventoryMax) => {
+    const maxQty = Math.max(0, Number(inventoryMax || 0));
+    const clamped = Math.max(0, Math.min(maxQty, Math.floor(Number(nextQty) || 0)));
+    setOgSaleCart((prev) => {
+      const next = { ...prev };
+      if (clamped <= 0) delete next[collectionAddress];
+      else next[collectionAddress] = clamped;
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCartQuote = async () => {
+      if (!showOgSaleModal || !CONTRACTS.OGSale) {
+        if (!cancelled) {
+          setOgSaleQuote({
+            loading: false,
+            count: 0,
+            rawWei: '0',
+            discountedWei: '0',
+            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            error: ''
+          });
+        }
+        return;
+      }
+
+      const expanded = [];
+      for (const row of ogSaleData.collections) {
+        const rawQty = Number(ogSaleCart[row.address] || 0);
+        const qty = Math.max(0, Math.min(Number(row.inventory || 0), Math.floor(rawQty)));
+        for (let i = 0; i < qty; i++) expanded.push(row.address);
+      }
+
+      const count = expanded.length;
+      if (count === 0) {
+        if (!cancelled) {
+          setOgSaleQuote({
+            loading: false,
+            count: 0,
+            rawWei: '0',
+            discountedWei: '0',
+            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            error: ''
+          });
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setOgSaleQuote((prev) => ({
+          ...prev,
+          loading: true,
+          count,
+          error: ''
+        }));
+      }
+
+      try {
+        const readProvider = getReadProvider();
+        const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, readProvider);
+        const discountBps = Number(await sale.bundleDiscountBps().catch(() => ogSaleData.bundleDiscountBps || 1000));
+
+        let rawWei;
+        let discountedWei;
+        if (count === 1) {
+          rawWei = await sale.quoteBuy(expanded[0], 1);
+          discountedWei = rawWei;
+        } else {
+          const quote = await sale.quoteBundle(expanded);
+          rawWei = quote.rawPrice;
+          discountedWei = quote.discountedPrice;
+        }
+
+        if (!cancelled) {
+          setOgSaleQuote({
+            loading: false,
+            count,
+            rawWei: rawWei.toString(),
+            discountedWei: discountedWei.toString(),
+            discountBps: count >= 2 ? discountBps : 0,
+            error: ''
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setOgSaleQuote({
+            loading: false,
+            count,
+            rawWei: '0',
+            discountedWei: '0',
+            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            error: getReadableError(err)
+          });
+        }
+      }
+    };
+
+    loadCartQuote();
+    return () => {
+      cancelled = true;
+    };
+  }, [showOgSaleModal, ogSaleData.collections, ogSaleData.bundleDiscountBps, ogSaleCart]);
+
+  const handleBuyOgCart = async () => {
     if (!window.ethereum) {
       showToast('error', 'Wallet not found');
       return;
@@ -389,8 +482,10 @@ const ToadzFinal = () => {
       showToast('error', 'OG sale not configured');
       return;
     }
-    if (!ogSaleData.bundleCollections || ogSaleData.bundleCollections.length < 2) {
-      showToast('error', 'Bundle unavailable');
+
+    const expanded = buildOgSaleCartCollections();
+    if (expanded.length === 0) {
+      showToast('error', 'Select at least 1 NFT');
       return;
     }
 
@@ -408,17 +503,24 @@ const ToadzFinal = () => {
       const web3Signer = await web3Provider.getSigner();
       const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, web3Signer);
 
-      const [, discountedPrice] = await sale.quoteBundle(ogSaleData.bundleCollections);
-      const maxPrice = discountedPrice + (discountedPrice * 300n) / 10_000n; // 3% slippage buffer.
+      let tx;
+      if (expanded.length === 1) {
+        const priceWei = await sale.quoteBuy(expanded[0], 1);
+        const maxPrice = priceWei + (priceWei * 300n) / 10_000n;
+        tx = await sale.buySingle(expanded[0], maxPrice, { value: maxPrice });
+      } else {
+        const [, discountedPrice] = await sale.quoteBundle(expanded);
+        const maxPrice = discountedPrice + (discountedPrice * 300n) / 10_000n;
+        tx = await sale.buyBundle(expanded, maxPrice, { value: maxPrice });
+      }
 
-      const tx = await sale.buyBundle(ogSaleData.bundleCollections, maxPrice, { value: maxPrice });
       await tx.wait();
-
-      showToast('success', 'Bundle purchased');
+      showToast('success', expanded.length >= 2 ? `Purchased ${expanded.length} NFTs` : 'OG purchased');
       await loadOgSaleData();
+      setOgSaleCart({});
       if (walletAddress) await loadUserData(walletAddress, contracts);
     } catch (err) {
-      showToast('error', `Bundle failed: ${getReadableError(err)}`);
+      showToast('error', `Purchase failed: ${getReadableError(err)}`);
     } finally {
       setOgSaleBuying(false);
     }
@@ -7055,7 +7157,7 @@ useEffect(() => {
                     >×</button>
                   </div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-                    Testnet preview: choose a collection or buy bundle (10% off curve total).
+                    Testnet preview: add quantities per collection. Discount starts at 2+ NFTs in any mix.
                   </div>
 
                   {ogSaleLoading ? (
@@ -7075,7 +7177,8 @@ useEffect(() => {
                     <>
                       <div style={{ display: 'grid', gap: 10 }}>
                         {ogSaleData.collections.map((row) => {
-                          const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying;
+                          const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying || ogSaleLoading;
+                          const qty = Number(ogSaleCart[row.address] || 0);
                           return (
                             <div
                               key={row.address}
@@ -7100,24 +7203,48 @@ useEffect(() => {
                                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>current curve price</div>
                                 </div>
                               </div>
-                              <button
-                                disabled={disabled}
-                                onClick={() => handleBuyOgSingle(row.address, row.currentPriceWei)}
-                                style={{
-                                  width: '100%',
-                                  marginTop: 10,
-                                  borderRadius: 8,
-                                  border: disabled ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                                  background: disabled ? 'rgba(255,255,255,0.08)' : '#00ff88',
-                                  color: disabled ? 'rgba(255,255,255,0.45)' : '#000',
-                                  padding: '10px 12px',
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: disabled ? 'not-allowed' : 'pointer'
-                                }}
-                              >
-                                {row.inventory <= 0 ? 'Sold out' : (!row.enabled ? 'Disabled' : 'Buy 1')}
-                              </button>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Quantity</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <button
+                                    disabled={disabled || qty <= 0}
+                                    onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 6,
+                                      border: '1px solid rgba(255,255,255,0.16)',
+                                      background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.12)',
+                                      color: (disabled || qty <= 0) ? 'rgba(255,255,255,0.35)' : '#fff',
+                                      fontWeight: 700,
+                                      cursor: (disabled || qty <= 0) ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >-</button>
+                                  <div style={{
+                                    minWidth: 26,
+                                    textAlign: 'center',
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    color: qty > 0 ? '#00ff88' : 'rgba(255,255,255,0.6)'
+                                  }}>
+                                    {qty}
+                                  </div>
+                                  <button
+                                    disabled={disabled || qty >= row.inventory}
+                                    onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 6,
+                                      border: '1px solid rgba(255,255,255,0.16)',
+                                      background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
+                                      color: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.35)' : '#00ff88',
+                                      fontWeight: 700,
+                                      cursor: (disabled || qty >= row.inventory) ? 'not-allowed' : 'pointer'
+                                    }}
+                                  >+</button>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -7130,36 +7257,49 @@ useEffect(() => {
                         padding: 12,
                         background: 'rgba(168,85,247,0.07)'
                       }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Bundle (1 from each enabled collection)</div>
-                        {ogSaleData.bundleCollections.length >= 2 ? (
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+                          Cart ({ogSaleQuote.count} NFT{ogSaleQuote.count === 1 ? '' : 's'})
+                        </div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>
+                          Buy 2+ to unlock {((ogSaleData.bundleDiscountBps || 1000) / 100).toFixed(0)}% discount (any mix, including same collection).
+                        </div>
+
+                        {ogSaleQuote.error ? (
+                          <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 10 }}>{ogSaleQuote.error}</div>
+                        ) : ogSaleQuote.count > 0 ? (
                           <>
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>
-                              Curve total: {Number(ethers.formatEther(ogSaleData.bundleRawWei)).toFixed(3)} FLR
+                              Curve total: {Number(ethers.formatEther(ogSaleQuote.rawWei || '0')).toFixed(3)} FLR
                             </div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88', marginBottom: 10 }}>
-                              Bundle price (10% off): {Number(ethers.formatEther(ogSaleData.bundleDiscountedWei)).toFixed(3)} FLR
+                              Final price: {Number(ethers.formatEther(ogSaleQuote.discountedWei || '0')).toFixed(3)} FLR
                             </div>
+                            {ogSaleQuote.count >= 2 && (
+                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+                                You save {Number(ethers.formatEther((BigInt(ogSaleQuote.rawWei || '0') - BigInt(ogSaleQuote.discountedWei || '0')).toString())).toFixed(3)} FLR
+                              </div>
+                            )}
                             <button
-                              disabled={ogSaleBuying}
-                              onClick={handleBuyOgBundle}
+                              disabled={ogSaleBuying || ogSaleQuote.loading}
+                              onClick={handleBuyOgCart}
                               style={{
                                 width: '100%',
                                 borderRadius: 8,
-                                border: ogSaleBuying ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                                background: ogSaleBuying ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                border: (ogSaleBuying || ogSaleQuote.loading) ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                                background: (ogSaleBuying || ogSaleQuote.loading) ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #a855f7, #ec4899)',
                                 color: '#fff',
                                 padding: '10px 12px',
                                 fontSize: 12,
                                 fontWeight: 700,
-                                cursor: ogSaleBuying ? 'not-allowed' : 'pointer'
+                                cursor: (ogSaleBuying || ogSaleQuote.loading) ? 'not-allowed' : 'pointer'
                               }}
                             >
-                              {ogSaleBuying ? 'Processing...' : 'Buy Bundle'}
+                              {ogSaleBuying ? 'Processing...' : (ogSaleQuote.count >= 2 ? `Buy ${ogSaleQuote.count} with Discount` : 'Buy 1')}
                             </button>
                           </>
                         ) : (
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                            Bundle unavailable until at least 2 enabled collections have inventory.
+                            Select quantity to continue.
                           </div>
                         )}
                       </div>
