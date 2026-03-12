@@ -329,10 +329,8 @@ const ToadzFinal = () => {
   const ogSaleSavingsWei = ogSaleRawWei > ogSaleDiscountedWei ? (ogSaleRawWei - ogSaleDiscountedWei) : 0n;
   const ogSaleOwedFlr = Number(ethers.formatEther(ogSaleDiscountedWei));
   const ogSaleSavingsFlr = Number(ethers.formatEther(ogSaleSavingsWei));
-  const ogSaleDiscountPct = ogSaleRawWei > 0n ? (Number((ogSaleSavingsWei * 10_000n) / ogSaleRawWei) / 100) : 0;
   const ogSaleOwedDisplay = ogSaleQuote.count > 0 ? ogSaleOwedFlr.toFixed(2) : '0';
   const ogSaleSavingsDisplay = ogSaleQuote.count > 0 ? ogSaleSavingsFlr.toFixed(2) : '0';
-  const ogSaleDiscountPctDisplay = ogSaleQuote.count > 0 ? `${ogSaleDiscountPct.toFixed(1)}%` : '0%';
 
   const loadOgSaleData = async () => {
     if (!CONTRACTS.OGSale) {
@@ -7255,13 +7253,12 @@ useEffect(() => {
                   style={{
                     width: '100%',
                     maxWidth: 500,
-                    height: 'min(86vh, 640px)',
+                    maxHeight: '90vh',
                     background: '#0d0d12',
                     border: '1px solid rgba(168,85,247,0.25)',
                     borderRadius: 16,
                     padding: 18,
-                    display: 'flex',
-                    flexDirection: 'column'
+                    overflowY: 'auto'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -7316,125 +7313,123 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: 2 }}>
-                    {ogSaleLoading ? (
-                      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>Loading OG shop...</div>
-                    ) : (
-                      <div style={{ display: 'grid', gap: 10 }}>
-                        {ogSaleRows.map((row) => {
-                          const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying || ogSaleLoading;
-                          const qty = Number(ogSaleCart[row.address] || 0);
-                          const lowerLabel = String(row.label || '').toLowerCase();
-                          const icon = lowerLabel.includes('loft') ? '🏢' : (lowerLabel.includes('city') ? '🌆' : '🐸');
-                          return (
-                            <div
-                              key={row.address}
-                              style={{
-                                border: '1px solid rgba(0,255,136,0.24)',
-                                borderRadius: 12,
-                                padding: 12,
-                                background: 'linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(0,255,136,0.03) 100%)'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <div style={{
-                                    width: 34,
-                                    height: 34,
-                                    borderRadius: 8,
-                                    background: 'rgba(0,255,136,0.15)',
-                                    border: '1px solid rgba(0,255,136,0.22)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 18
-                                  }}>
-                                    {icon}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: 16, fontWeight: 800 }}>{row.label}</div>
-                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
-                                      {row.inventory > 0 ? `${row.inventory} left` : 'Sold out'}
-                                    </div>
-                                  </div>
+                  {ogSaleLoading ? (
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginBottom: 12 }}>Loading OG shop...</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+                      {ogSaleRows.map((row) => {
+                        const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying || ogSaleLoading;
+                        const qty = Number(ogSaleCart[row.address] || 0);
+                        const lowerLabel = String(row.label || '').toLowerCase();
+                        const icon = lowerLabel.includes('loft') ? '🏢' : (lowerLabel.includes('city') ? '🌆' : '🐸');
+                        return (
+                          <div
+                            key={row.address}
+                            style={{
+                              border: '1px solid rgba(0,255,136,0.24)',
+                              borderRadius: 12,
+                              padding: 12,
+                              background: 'linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(0,255,136,0.03) 100%)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: 8,
+                                  background: 'rgba(0,255,136,0.15)',
+                                  border: '1px solid rgba(0,255,136,0.22)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 18
+                                }}>
+                                  {icon}
                                 </div>
-                                <div style={{ fontSize: 18, fontWeight: 900, color: '#00ff88' }}>
-                                  {row.currentPrice.toFixed(2)} FLR
+                                <div>
+                                  <div style={{ fontSize: 16, fontWeight: 800 }}>{row.label}</div>
+                                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                                    {row.inventory > 0 ? `${row.inventory} left` : 'Sold out'}
+                                  </div>
                                 </div>
                               </div>
-
-                              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
-                                <button
-                                  disabled={disabled || qty <= 0}
-                                  onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
-                                  style={{
-                                    width: 34,
-                                    height: 34,
-                                    borderRadius: 10,
-                                    border: '1px solid rgba(255,255,255,0.18)',
-                                    background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)',
-                                    color: (disabled || qty <= 0) ? 'rgba(255,255,255,0.35)' : '#fff',
-                                    fontSize: 18,
-                                    fontWeight: 800,
-                                    cursor: (disabled || qty <= 0) ? 'not-allowed' : 'pointer'
-                                  }}
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={row.inventory}
-                                  inputMode="numeric"
-                                  value={qty}
-                                  disabled={disabled}
-                                  onChange={(e) => {
-                                    const raw = String(e.target.value || '').replace(/[^0-9]/g, '');
-                                    const nextQty = raw === '' ? 0 : Number(raw);
-                                    setOgSaleCartQty(row.address, nextQty, row.inventory);
-                                  }}
-                                  style={{
-                                    width: 62,
-                                    height: 34,
-                                    borderRadius: 8,
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    background: disabled ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.35)',
-                                    color: '#fff',
-                                    fontSize: 18,
-                                    fontWeight: 900,
-                                    textAlign: 'center',
-                                    outline: 'none'
-                                  }}
-                                />
-                                <button
-                                  disabled={disabled || qty >= row.inventory}
-                                  onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
-                                  style={{
-                                    width: 34,
-                                    height: 34,
-                                    borderRadius: 10,
-                                    border: '1px solid rgba(0,255,136,0.45)',
-                                    background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
-                                    color: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.35)' : '#00ff88',
-                                    fontSize: 18,
-                                    fontWeight: 800,
-                                    cursor: (disabled || qty >= row.inventory) ? 'not-allowed' : 'pointer'
-                                  }}
-                                >
-                                  +
-                                </button>
+                              <div style={{ fontSize: 18, fontWeight: 900, color: '#00ff88' }}>
+                                {row.currentPrice.toFixed(2)} FLR
                               </div>
                             </div>
-                          );
-                        })}
-                        {ogSaleRows.length === 0 && (
-                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                            OG shop unavailable.
+
+                            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                              <button
+                                disabled={disabled || qty <= 0}
+                                onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: 10,
+                                  border: '1px solid rgba(255,255,255,0.18)',
+                                  background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)',
+                                  color: (disabled || qty <= 0) ? 'rgba(255,255,255,0.35)' : '#fff',
+                                  fontSize: 18,
+                                  fontWeight: 800,
+                                  cursor: (disabled || qty <= 0) ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min={0}
+                                max={row.inventory}
+                                inputMode="numeric"
+                                value={qty}
+                                disabled={disabled}
+                                onChange={(e) => {
+                                  const raw = String(e.target.value || '').replace(/[^0-9]/g, '');
+                                  const nextQty = raw === '' ? 0 : Number(raw);
+                                  setOgSaleCartQty(row.address, nextQty, row.inventory);
+                                }}
+                                style={{
+                                  width: 62,
+                                  height: 34,
+                                  borderRadius: 8,
+                                  border: '1px solid rgba(255,255,255,0.2)',
+                                  background: disabled ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.35)',
+                                  color: '#fff',
+                                  fontSize: 18,
+                                  fontWeight: 900,
+                                  textAlign: 'center',
+                                  outline: 'none'
+                                }}
+                              />
+                              <button
+                                disabled={disabled || qty >= row.inventory}
+                                onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: 10,
+                                  border: '1px solid rgba(0,255,136,0.45)',
+                                  background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
+                                  color: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.35)' : '#00ff88',
+                                  fontSize: 18,
+                                  fontWeight: 800,
+                                  cursor: (disabled || qty >= row.inventory) ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                        );
+                      })}
+                      {ogSaleRows.length === 0 && (
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                          OG shop unavailable.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{
                     marginTop: 12,
@@ -7447,14 +7442,6 @@ useEffect(() => {
                       {ogSaleQuote.count > 0 ? `Cart (${ogSaleQuote.count} NFTs)` : 'Cart (0 NFTs)'}
                     </div>
                     <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total NFTs</span>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{ogSaleQuote.count}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Discount achieved</span>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: '#fef08a' }}>{ogSaleDiscountPctDisplay}</span>
-                      </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total discount achieved</span>
                         <span style={{ fontSize: 15, fontWeight: 900, color: '#00ff88' }}>{ogSaleSavingsDisplay} FLR</span>
@@ -7494,18 +7481,8 @@ useEffect(() => {
                         ? 'Processing...'
                         : (ogSaleQuote.count > 0
                           ? `Buy ${ogSaleQuote.count}`
-                          : 'Pick OGs')}
+                          : 'Add to Cart')}
                     </button>
-                    <div style={{
-                      marginTop: 8,
-                      textAlign: 'center',
-                      fontSize: 10,
-                      letterSpacing: '0.2em',
-                      color: 'rgba(255,255,255,0.45)',
-                      textTransform: 'uppercase'
-                    }}>
-                      Permanent lock · OG NFTs cannot be unlocked
-                    </div>
                   </div>
                 </div>
               </div>
