@@ -324,6 +324,7 @@ const ToadzFinal = () => {
 
   const ogSaleRows = ogSaleSimulationMode ? ogSaleSimRows : ogSaleData.collections;
   const ogSaleDiscountBps = ogSaleSimulationMode ? OG_SALE_SIM_DISCOUNT_BPS : (ogSaleData.bundleDiscountBps || 1000);
+  const isOgSaleMobile = windowWidth <= 520;
   const ogSaleRawWei = BigInt(ogSaleQuote.rawWei || '0');
   const ogSaleDiscountedWei = BigInt(ogSaleQuote.discountedWei || '0');
   const ogSaleSavingsWei = ogSaleRawWei > ogSaleDiscountedWei ? (ogSaleRawWei - ogSaleDiscountedWei) : 0n;
@@ -7248,9 +7249,13 @@ useEffect(() => {
                   background: 'rgba(0,0,0,0.85)',
                   zIndex: 1200,
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: isOgSaleMobile ? 'flex-start' : 'center',
                   justifyContent: 'center',
-                  padding: 20
+                  overflowY: 'auto',
+                  paddingTop: isOgSaleMobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 20,
+                  paddingBottom: isOgSaleMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 92px)' : 20,
+                  paddingLeft: isOgSaleMobile ? 10 : 20,
+                  paddingRight: isOgSaleMobile ? 10 : 20
                 }}
               >
                 <div
@@ -7258,11 +7263,11 @@ useEffect(() => {
                   style={{
                     width: '100%',
                     maxWidth: 500,
-                    maxHeight: '90vh',
+                    maxHeight: isOgSaleMobile ? 'calc(100dvh - 16px)' : '90vh',
                     background: '#0d0d12',
                     border: '1px solid rgba(168,85,247,0.25)',
                     borderRadius: 16,
-                    padding: 18,
+                    padding: isOgSaleMobile ? 14 : 18,
                     overflowY: 'auto'
                   }}
                 >
@@ -7291,13 +7296,19 @@ useEffect(() => {
                     <div style={{ fontSize: 12, color: '#fef08a', fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 8 }}>
                       Bulk savings - more = more
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 6 }}>
+                    <div style={{
+                      display: 'flex',
+                      gap: 6,
+                      overflowX: isOgSaleMobile ? 'auto' : 'visible',
+                      paddingBottom: 2
+                    }}>
                       {OG_SALE_BULK_TIERS.map((tier) => {
                         const active = ogSaleQuote.count >= tier.count;
                         return (
                           <div
                             key={`bulk-tier-${tier.count}`}
                             style={{
+                              minWidth: isOgSaleMobile ? 70 : 0,
                               borderRadius: 10,
                               border: active ? '1px solid rgba(0,255,136,0.45)' : '1px solid rgba(250,204,21,0.32)',
                               background: active ? 'rgba(0,255,136,0.13)' : 'rgba(17,24,18,0.55)',
@@ -7337,7 +7348,13 @@ useEffect(() => {
                               background: 'linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(0,255,136,0.03) 100%)'
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: isOgSaleMobile ? 'flex-start' : 'center',
+                              flexDirection: isOgSaleMobile ? 'column' : 'row',
+                              gap: isOgSaleMobile ? 8 : 0
+                            }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{
                                   width: 34,
@@ -7359,7 +7376,12 @@ useEffect(() => {
                                   </div>
                                 </div>
                               </div>
-                              <div style={{ fontSize: 18, fontWeight: 900, color: '#00ff88' }}>
+                              <div style={{
+                                fontSize: isOgSaleMobile ? 16 : 18,
+                                fontWeight: 900,
+                                color: '#00ff88',
+                                alignSelf: isOgSaleMobile ? 'flex-end' : 'auto'
+                              }}>
                                 {row.currentPrice.toFixed(2)} FLR
                               </div>
                             </div>
@@ -7383,19 +7405,24 @@ useEffect(() => {
                                 -
                               </button>
                               <input
-                                type="number"
+                                type="text"
                                 min={0}
                                 max={row.inventory}
                                 inputMode="numeric"
                                 value={qty}
                                 disabled={disabled}
+                                onFocus={(e) => {
+                                  if (e.target.value === '0') e.target.select();
+                                }}
                                 onChange={(e) => {
-                                  const raw = String(e.target.value || '').replace(/[^0-9]/g, '');
+                                  const raw = String(e.target.value || '')
+                                    .replace(/[^0-9]/g, '')
+                                    .replace(/^0+(?=\d)/, '');
                                   const nextQty = raw === '' ? 0 : Number(raw);
                                   setOgSaleCartQty(row.address, nextQty, row.inventory);
                                 }}
                                 style={{
-                                  width: 62,
+                                  width: isOgSaleMobile ? 72 : 62,
                                   height: 34,
                                   borderRadius: 8,
                                   border: '1px solid rgba(255,255,255,0.2)',
