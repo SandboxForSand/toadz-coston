@@ -1,6 +1,6 @@
 {
   "network": "flare",
-  "timestamp": "2026-03-08T16:28:27.887Z",
+  "timestamp": "2026-03-08T18:31:08.284Z",
   "deployer": "0x9bDB29529016a15754373B9D5B5116AB728E916e",
   "contracts": {
     "tadz": "0x9B25f6879EBDc3a0795acc9A5092FCF2Dd536382",
@@ -8,14 +8,14 @@
     "claimerImpl": "0xC023a0997Afbe0dE6Bc5c127284241898da3f54c"
   },
   "canary": {
-    "allocation": "20000",
-    "merkleRoot": "0x274405b634f6481fc087bf7a67d6b71428610f55ad8c12f9e10489493b6f7f3a",
+    "allocation": "60000",
+    "merkleRoot": "0x0231b82c937e21351eeced6b11efdb6a31917b31bed979aa317f4231526fb156",
     "proof": [],
-    "seedCount": "10000"
+    "seedCount": "50000"
   },
   "runtime": {
     "claimed": "10000",
-    "claimable": "10000",
-    "availableTokens": "10000"
+    "claimable": "50000",
+    "availableTokens": "50000"
   }
 }

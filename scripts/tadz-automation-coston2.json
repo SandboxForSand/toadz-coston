@@ -1,0 +1,32 @@
+{
+  "network": "coston2",
+  "timestamp": "2026-03-04T14:37:42.718Z",
+  "deployer": "0x9bDB29529016a15754373B9D5B5116AB728E916e",
+  "ogCollection": "0x395ff0eA8B02e2eE261FFFDA8c6Df8e56512E04F",
+  "tadzCollection": "0x0BF9068F7Ebdb222B4E7d613859Af286dC9E396D",
+  "ogVault": "0x812B7F96966b94C9ECa198ac0553840ACabbd18A",
+  "claimer": "0xdaE9CB4D6F686e31E12887a1C1c017Edf53e94B2",
+  "seededTokenIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "notes": "Use scripts/refresh-tadz-merkle.js with OGVAULT_ADDRESS + CLAIMER_ADDRESS to auto-refresh roots."
+}

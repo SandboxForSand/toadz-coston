@@ -44,6 +44,8 @@ async function main() {
 
   const claimed = await claimer.claimed(user);
   let available = await claimer.availableTokens();
+  const feeData = await ethers.provider.getFeeData();
+  const txFee = feeData.gasPrice ? { gasPrice: feeData.gasPrice } : {};
 
   const newAllocation = claimed + targetClaimable;
   const newRoot = ethers.keccak256(
@@ -63,11 +65,21 @@ async function main() {
       const chunk = toSeed > mintChunk ? mintChunk : toSeed;
       const first = await tadz.nextTokenId();
 
-      const mintTx = await tadz.mintBatch(canary.contracts.claimerProxy, Number(chunk));
+      const mintEst = await tadz.mintBatch.estimateGas(canary.contracts.claimerProxy, Number(chunk));
+      const mintGasLimit = (mintEst * 115n) / 100n + 50000n;
+      const mintTx = await tadz.mintBatch(canary.contracts.claimerProxy, Number(chunk), {
+        gasLimit: mintGasLimit,
+        ...txFee
+      });
       await mintTx.wait();
 
       const ids = rangeBigInt(first, chunk);
-      const depTx = await claimer.depositTokenIds(ids);
+      const depEst = await claimer.depositTokenIds.estimateGas(ids);
+      const depGasLimit = (depEst * 115n) / 100n + 50000n;
+      const depTx = await claimer.depositTokenIds(ids, {
+        gasLimit: depGasLimit,
+        ...txFee
+      });
       await depTx.wait();
 
       toSeed -= chunk;
@@ -104,4 +116,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
