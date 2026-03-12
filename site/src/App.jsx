@@ -40,9 +40,9 @@ const OG_SALE_BULK_TIERS = Object.freeze([
 const OG_SALE_BULK_TARGETS = Object.freeze(OG_SALE_BULK_TIERS.map((tier) => tier.count));
 const OG_SALE_SIM_DISCOUNT_BPS = 1000;
 const OG_SALE_SIM_BASE_ROWS = Object.freeze([
-  { address: 'sim:stoadz', label: 'sToadz', sold: 0, inventory: 127, basePrice: 15, stepPrice: 0.25, enabled: true },
-  { address: 'sim:lofts', label: 'Luxury Lofts', sold: 0, inventory: 3000, basePrice: 15, stepPrice: 0.015, enabled: true },
-  { address: 'sim:city', label: 'Songbird City', sold: 0, inventory: 3000, basePrice: 15, stepPrice: 0.015, enabled: true },
+  { address: 'sim:stoadz', label: 'sToadz', sold: 0, inventory: 127, basePrice: 2500, stepPrice: 0.5, enabled: true },
+  { address: 'sim:lofts', label: 'Luxury Lofts', sold: 0, inventory: 3000, basePrice: 2500, stepPrice: 0.5, enabled: true },
+  { address: 'sim:city', label: 'Songbird City', sold: 0, inventory: 3000, basePrice: 2500, stepPrice: 0.5, enabled: true },
 ]);
 
 const calcLinearQuoteWei = (baseWei, stepWei, soldCount, quantity) => {
