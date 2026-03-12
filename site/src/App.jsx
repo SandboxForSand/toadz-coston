@@ -331,6 +331,11 @@ const ToadzFinal = () => {
   const ogSaleSavingsFlr = Number(ethers.formatEther(ogSaleSavingsWei));
   const ogSaleOwedDisplay = ogSaleQuote.count > 0 ? ogSaleOwedFlr.toFixed(2) : '0';
   const ogSaleSavingsDisplay = ogSaleQuote.count > 0 ? ogSaleSavingsFlr.toFixed(2) : '0';
+  const ogSaleQualifiedTier = [...OG_SALE_BULK_TIERS].reverse().find((tier) => ogSaleQuote.count >= tier.count) || null;
+  const ogSaleStatusText = ogSaleQualifiedTier
+    ? `You've qualified for ${ogSaleQualifiedTier.discount}% discount`
+    : 'Add 5+ NFTs to unlock your first discount';
+  const ogSaleStatusColor = ogSaleQualifiedTier ? '#00ff88' : '#fef08a';
 
   const loadOgSaleData = async () => {
     if (!CONTRACTS.OGSale) {
@@ -7454,11 +7459,9 @@ useEffect(() => {
                     {ogSaleQuote.error ? (
                       <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 8 }}>{ogSaleQuote.error}</div>
                     ) : null}
-                    {ogSaleQuote.count < 5 && (
-                      <div style={{ fontSize: 12, color: '#fef08a', marginBottom: 8 }}>
-                        Buy 5+ to start bigger savings.
-                      </div>
-                    )}
+                    <div style={{ fontSize: 12, color: ogSaleStatusColor, marginBottom: 8, minHeight: 18 }}>
+                      {ogSaleStatusText}
+                    </div>
                     <button
                       disabled={ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0}
                       onClick={handleBuyOgCart}
