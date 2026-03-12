@@ -10381,8 +10381,8 @@ useEffect(() => {
               onClick={() => setLegalModal('privacy')}
               style={{
                 background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.14)',
-                color: 'rgba(255,255,255,0.82)',
+                border: 'none',
+                color: 'rgba(255,255,255,0.72)',
                 borderRadius: 999,
                 padding: '6px 12px',
                 fontSize: 12,
@@ -10396,8 +10396,8 @@ useEffect(() => {
               onClick={() => setLegalModal('terms')}
               style={{
                 background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.14)',
-                color: 'rgba(255,255,255,0.82)',
+                border: 'none',
+                color: 'rgba(255,255,255,0.72)',
                 borderRadius: 999,
                 padding: '6px 12px',
                 fontSize: 12,
@@ -10418,12 +10418,12 @@ useEffect(() => {
                 width: 34,
                 height: 34,
                 borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.04)',
+                border: 'none',
+                background: 'transparent',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff'
+                color: 'rgba(255,255,255,0.82)'
               }}
               aria-label="xToadz on X"
               title="xToadz on X"
@@ -10438,12 +10438,12 @@ useEffect(() => {
                 width: 34,
                 height: 34,
                 borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.04)',
+                border: 'none',
+                background: 'transparent',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff'
+                color: 'rgba(255,255,255,0.82)'
               }}
               aria-label="xToadz on Discord"
               title="xToadz on Discord"
