@@ -30,7 +30,14 @@ const RENTAL_MODEL_FALLBACK_DAILY_FLR = 12;
 const RENTAL_MODEL_CACHE_KEY = 'toadz_rental_model_cache_v1';
 const RENTAL_CONSERVATIVE_STAKE_FLR = 1000;
 const RENTAL_CONSERVATIVE_LOCK_MULTIPLIER = 1;
-const OG_SALE_BULK_TARGETS = Object.freeze([5, 10, 20, 50, 100]);
+const OG_SALE_BULK_TIERS = Object.freeze([
+  { count: 5, discount: 5 },
+  { count: 10, discount: 10 },
+  { count: 20, discount: 15 },
+  { count: 50, discount: 20 },
+  { count: 100, discount: 30 }
+]);
+const OG_SALE_BULK_TARGETS = Object.freeze(OG_SALE_BULK_TIERS.map((tier) => tier.count));
 const OG_SALE_SIM_DISCOUNT_BPS = 1000;
 const OG_SALE_SIM_BASE_ROWS = Object.freeze([
   { address: 'sim:stoadz', label: 'sToadz', sold: 0, inventory: 127, basePrice: 15, stepPrice: 0.25, enabled: true },
@@ -322,8 +329,10 @@ const ToadzFinal = () => {
   const ogSaleSavingsWei = ogSaleRawWei > ogSaleDiscountedWei ? (ogSaleRawWei - ogSaleDiscountedWei) : 0n;
   const ogSaleOwedFlr = Number(ethers.formatEther(ogSaleDiscountedWei));
   const ogSaleSavingsFlr = Number(ethers.formatEther(ogSaleSavingsWei));
+  const ogSaleDiscountPct = ogSaleRawWei > 0n ? (Number((ogSaleSavingsWei * 10_000n) / ogSaleRawWei) / 100) : 0;
   const ogSaleOwedDisplay = ogSaleQuote.count > 0 ? ogSaleOwedFlr.toFixed(2) : '0';
   const ogSaleSavingsDisplay = ogSaleQuote.count > 0 ? ogSaleSavingsFlr.toFixed(2) : '0';
+  const ogSaleDiscountPctDisplay = ogSaleQuote.count > 0 ? `${ogSaleDiscountPct.toFixed(1)}%` : '0%';
 
   const loadOgSaleData = async () => {
     if (!CONTRACTS.OGSale) {
@@ -7272,34 +7281,38 @@ useEffect(() => {
                   </div>
                   <div style={{
                     marginBottom: 12,
-                    padding: '14px 12px',
+                    padding: 12,
                     borderRadius: 12,
-                    border: '1px solid rgba(250,204,21,0.34)',
-                    background: 'linear-gradient(135deg, rgba(250,204,21,0.14) 0%, rgba(250,204,21,0.05) 100%)'
+                    border: '1px solid rgba(250,204,21,0.28)',
+                    background: 'linear-gradient(135deg, rgba(250,204,21,0.16) 0%, rgba(250,204,21,0.04) 100%)'
                   }}>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: '#fef08a', lineHeight: 1.1, marginBottom: 4 }}>
-                      Bulk discounts
+                    <div style={{ fontSize: 12, color: '#fef08a', fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Bulk savings - more = more
                     </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.84)', marginBottom: 8 }}>
-                      Bigger checkout size unlocks bigger savings.
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {OG_SALE_BULK_TARGETS.map((target) => (
-                        <div
-                          key={`bulk-target-${target}`}
-                          style={{
-                            borderRadius: 999,
-                            border: '1px solid rgba(250,204,21,0.35)',
-                            background: 'rgba(250,204,21,0.14)',
-                            color: '#fef08a',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '3px 8px'
-                          }}
-                        >
-                          {target}+
-                        </div>
-                      ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 6 }}>
+                      {OG_SALE_BULK_TIERS.map((tier) => {
+                        const active = ogSaleQuote.count >= tier.count;
+                        return (
+                          <div
+                            key={`bulk-tier-${tier.count}`}
+                            style={{
+                              borderRadius: 10,
+                              border: active ? '1px solid rgba(0,255,136,0.45)' : '1px solid rgba(250,204,21,0.32)',
+                              background: active ? 'rgba(0,255,136,0.13)' : 'rgba(17,24,18,0.55)',
+                              minHeight: 64,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 0.9, color: active ? '#00ff88' : '#fff' }}>{tier.count}+</div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: active ? '#00ff88' : '#fef08a', marginTop: 2 }}>
+                              {tier.discount}% OFF
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -7317,15 +7330,27 @@ useEffect(() => {
                             <div
                               key={row.address}
                               style={{
-                                border: '1px solid rgba(255,255,255,0.09)',
+                                border: '1px solid rgba(0,255,136,0.24)',
                                 borderRadius: 12,
                                 padding: 12,
-                                background: 'linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,255,136,0.02) 100%)'
+                                background: 'linear-gradient(135deg, rgba(0,255,136,0.1) 0%, rgba(0,255,136,0.03) 100%)'
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 18 }}>{icon}</span>
+                                  <div style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: 8,
+                                    background: 'rgba(0,255,136,0.15)',
+                                    border: '1px solid rgba(0,255,136,0.22)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 18
+                                  }}>
+                                    {icon}
+                                  </div>
                                   <div>
                                     <div style={{ fontSize: 16, fontWeight: 800 }}>{row.label}</div>
                                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
@@ -7356,9 +7381,31 @@ useEffect(() => {
                                 >
                                   -
                                 </button>
-                                <div style={{ minWidth: 26, textAlign: 'center', fontSize: 20, fontWeight: 900, color: '#00ff88' }}>
-                                  {qty}
-                                </div>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={row.inventory}
+                                  inputMode="numeric"
+                                  value={qty}
+                                  disabled={disabled}
+                                  onChange={(e) => {
+                                    const raw = String(e.target.value || '').replace(/[^0-9]/g, '');
+                                    const nextQty = raw === '' ? 0 : Number(raw);
+                                    setOgSaleCartQty(row.address, nextQty, row.inventory);
+                                  }}
+                                  style={{
+                                    width: 62,
+                                    height: 34,
+                                    borderRadius: 8,
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    background: disabled ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.35)',
+                                    color: '#fff',
+                                    fontSize: 18,
+                                    fontWeight: 900,
+                                    textAlign: 'center',
+                                    outline: 'none'
+                                  }}
+                                />
                                 <button
                                   disabled={disabled || qty >= row.inventory}
                                   onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
@@ -7391,27 +7438,40 @@ useEffect(() => {
 
                   <div style={{
                     marginTop: 12,
-                    border: '1px solid rgba(168,85,247,0.32)',
+                    border: '1px solid rgba(0,255,136,0.24)',
                     borderRadius: 12,
                     padding: 12,
-                    background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.12) 100%)'
+                    background: 'rgba(0,0,0,0.25)'
                   }}>
                     <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>
-                      {ogSaleQuote.count > 0 ? `Cart (${ogSaleQuote.count})` : 'Cart (0)'}
+                      {ogSaleQuote.count > 0 ? `Cart (${ogSaleQuote.count} NFTs)` : 'Cart (0 NFTs)'}
                     </div>
                     <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total FLR owed</span>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: '#00ff88' }}>{ogSaleOwedDisplay} FLR</span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total NFTs</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{ogSaleQuote.count}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Discount achieved</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#fef08a' }}>{ogSaleDiscountPctDisplay}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total discount achieved</span>
                         <span style={{ fontSize: 15, fontWeight: 900, color: '#00ff88' }}>{ogSaleSavingsDisplay} FLR</span>
                       </div>
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 2, paddingTop: 6, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)' }}>TOTAL FLR owed</span>
+                        <span style={{ fontSize: 21, fontWeight: 900, color: '#00ff88' }}>{ogSaleOwedDisplay} FLR</span>
+                      </div>
                     </div>
                     {ogSaleQuote.error ? (
                       <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 8 }}>{ogSaleQuote.error}</div>
                     ) : null}
+                    {ogSaleQuote.count < 5 && (
+                      <div style={{ fontSize: 12, color: '#fef08a', marginBottom: 8 }}>
+                        Buy 5+ to start bigger savings.
+                      </div>
+                    )}
                     <button
                       disabled={ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0}
                       onClick={handleBuyOgCart}
@@ -7436,6 +7496,16 @@ useEffect(() => {
                           ? `Buy ${ogSaleQuote.count}`
                           : 'Pick OGs')}
                     </button>
+                    <div style={{
+                      marginTop: 8,
+                      textAlign: 'center',
+                      fontSize: 10,
+                      letterSpacing: '0.2em',
+                      color: 'rgba(255,255,255,0.45)',
+                      textTransform: 'uppercase'
+                    }}>
+                      Permanent lock · OG NFTs cannot be unlocked
+                    </div>
                   </div>
                 </div>
               </div>
