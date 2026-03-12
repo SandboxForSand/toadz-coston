@@ -178,6 +178,7 @@ const ToadzFinal = () => {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [saleNotification, setSaleNotification] = useState(null);
   const [boostSyncNeeded, setBoostSyncNeeded] = useState(false);
+  const [legalModal, setLegalModal] = useState(null); // 'privacy' | 'terms' | null
   
   // Profile editor
   const [showProfileEditor, setShowProfileEditor] = useState(false);
@@ -3300,6 +3301,87 @@ useEffect(() => {
             padding: 0
           }}
         >✕</button>
+      </div>
+    );
+  };
+
+  const XLogo = ({ size = 16 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M4 3h4.62l4.2 5.54L18.02 3H21l-6.8 7.8L21.5 21h-4.62l-4.58-6.05L6.96 21H4l7-8.02L4 3z" />
+    </svg>
+  );
+
+  const DiscordLogo = ({ size = 16 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M20.317 4.37A19.79 19.79 0 0 0 15.126 3c-.225.404-.474.95-.649 1.374a18.27 18.27 0 0 0-5.954 0A13.44 13.44 0 0 0 7.873 3 19.74 19.74 0 0 0 2.68 4.37C-.313 8.983-.91 13.478-.61 17.91A19.95 19.95 0 0 0 6.5 21a15 15 0 0 0 1.49-2.45 12.52 12.52 0 0 1-2.35-1.14c.2-.15.39-.3.58-.47 4.53 2.13 9.44 2.13 13.91 0 .19.17.38.32.58.47-.74.43-1.53.82-2.35 1.14A14.88 14.88 0 0 0 19.85 21a19.88 19.88 0 0 0 7.1-3.09c.35-5.13-.55-9.59-3.63-13.54zM8.68 15.67c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42zm6.64 0c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.95-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42z" />
+    </svg>
+  );
+
+  const LegalModal = () => {
+    if (!legalModal) return null;
+    const title = legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
+    return (
+      <div
+        onClick={() => setLegalModal(null)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            maxWidth: 640,
+            maxHeight: '82vh',
+            overflowY: 'auto',
+            background: '#0b0d12',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 14,
+            padding: 18
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>{title}</h3>
+            <button
+              onClick={() => setLegalModal(null)}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.8)',
+                cursor: 'pointer'
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {legalModal === 'privacy' ? (
+            <div style={{ fontSize: 13, lineHeight: 1.7, color: 'rgba(255,255,255,0.84)' }}>
+              <p>ToadzStake uses your wallet address to provide app functionality. We do not collect passwords or private keys.</p>
+              <p>On-chain activity is public by design. Connected wallet addresses, transactions, and contract interactions are visible on public block explorers.</p>
+              <p>Third-party providers (RPC endpoints, wallet providers, hosting, analytics where enabled) may process technical request data.</p>
+              <p>Use of the app is at your own discretion. If you do not agree with this, do not use the service.</p>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, lineHeight: 1.7, color: 'rgba(255,255,255,0.84)' }}>
+              <p>ToadzStake is software for interacting with smart contracts. All blockchain transactions are final and irreversible.</p>
+              <p>You are solely responsible for wallet security, approvals, and transaction confirmations.</p>
+              <p>No guarantees are provided regarding rewards, pricing, uptime, or future functionality. Use at your own risk.</p>
+              <p>By using the app, you acknowledge smart contract and market risk and agree to these terms.</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -10281,6 +10363,95 @@ useEffect(() => {
         {activeTab === 'pool' && PoolPage()}
         {activeTab === 'refer' && ReferPage()}
         {activeTab === 'admin' && AdminPage()}
+
+        <footer
+          style={{
+            marginTop: 26,
+            paddingTop: 14,
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 12,
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              onClick={() => setLegalModal('privacy')}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.14)',
+                color: 'rgba(255,255,255,0.82)',
+                borderRadius: 999,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Privacy
+            </button>
+            <button
+              onClick={() => setLegalModal('terms')}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.14)',
+                color: 'rgba(255,255,255,0.82)',
+                borderRadius: 999,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Terms
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <a
+              href="https://x.com/xtoadz"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.04)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff'
+              }}
+              aria-label="xToadz on X"
+              title="xToadz on X"
+            >
+              <XLogo size={15} />
+            </a>
+            <a
+              href="https://discord.gg/xtoadz"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.04)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff'
+              }}
+              aria-label="xToadz on Discord"
+              title="xToadz on Discord"
+            >
+              <DiscordLogo size={15} />
+            </a>
+          </div>
+        </footer>
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
@@ -10288,6 +10459,7 @@ useEffect(() => {
 
       {/* Toast Notifications */}
       <Toast />
+      <LegalModal />
 
       {/* NFT Panel */}
       {showNFTPanel && <div onClick={() => setShowNFTPanel(false)} style={{ 
