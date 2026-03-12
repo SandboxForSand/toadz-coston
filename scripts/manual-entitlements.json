@@ -1,0 +1,15 @@
+{
+  "flare": {
+    "0xd288e9aa97019fed7cb46e19d8171aa1190c1abc": {
+      "manualTadzAllocation": 5136,
+      "legacyBreakdown": {
+        "sToadz": 576,
+        "loft": 555,
+        "city": 581
+      },
+      "sourceVault": "0xac3e3651a4fa87784dee501a962abd5005eebb64",
+      "reason": "Legacy Songbird vault carve-out for bricked contract migration"
+    }
+  },
+  "coston2": {}
+}
