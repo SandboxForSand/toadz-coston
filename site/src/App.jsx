@@ -7265,7 +7265,7 @@ useEffect(() => {
                   alignItems: isOgSaleMobile ? 'flex-start' : 'center',
                   justifyContent: 'center',
                   paddingTop: isOgSaleMobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 20,
-                  paddingBottom: isOgSaleMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)' : 20,
+                  paddingBottom: isOgSaleMobile ? 6 : 20,
                   paddingLeft: isOgSaleMobile ? 10 : 20,
                   paddingRight: isOgSaleMobile ? 10 : 20,
                   overscrollBehavior: 'contain',
@@ -7277,13 +7277,12 @@ useEffect(() => {
                   style={{
                     width: '100%',
                     maxWidth: 560,
-                    height: isOgSaleMobile
-                      ? 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 18px)'
-                      : 'min(86vh, 760px)',
+                    height: isOgSaleMobile ? 'calc(100svh - 16px)' : 'min(86vh, 760px)',
+                    maxHeight: isOgSaleMobile ? 'calc(100svh - 16px)' : 'min(86vh, 760px)',
                     background: '#0d0d12',
                     border: '1px solid rgba(168,85,247,0.25)',
                     borderRadius: 16,
-                    padding: isOgSaleMobile ? 14 : 18,
+                    padding: isOgSaleMobile ? 12 : 18,
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
@@ -7294,7 +7293,7 @@ useEffect(() => {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
-                    <div style={{ fontSize: isOgSaleMobile ? 44 : 30, fontWeight: 900, lineHeight: 1 }}>Buy OGs</div>
+                    <div style={{ fontSize: isOgSaleMobile ? 32 : 30, fontWeight: 900, lineHeight: 1 }}>Buy OGs</div>
                     <button
                       onClick={() => setShowOgSaleModal(false)}
                       style={{
@@ -7344,7 +7343,7 @@ useEffect(() => {
                             }}
                           >
                             <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 0.9, color: active ? '#00ff88' : '#fff' }}>{tier.count}+</div>
-                            <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#00ff88' : '#fef08a', marginTop: 2 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: active ? '#00ff88' : '#fef08a', marginTop: 2 }}>
                               {tier.discount}% OFF
                             </div>
                           </div>
@@ -7389,13 +7388,13 @@ useEffect(() => {
                                     {icon}
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: isOgSaleMobile ? 20 : 18, fontWeight: 800, color: '#f8fafc' }}>{row.label}</div>
-                                    <div style={{ fontSize: isOgSaleMobile ? 13 : 13, color: 'rgba(255,255,255,0.72)' }}>
+                                    <div style={{ fontSize: isOgSaleMobile ? 16 : 18, fontWeight: 800, color: '#f8fafc' }}>{row.label}</div>
+                                    <div style={{ fontSize: isOgSaleMobile ? 11 : 13, color: 'rgba(255,255,255,0.72)' }}>
                                       {row.inventory > 0 ? `${row.inventory} left` : 'Sold out'}
                                     </div>
                                   </div>
                                 </div>
-                                <div style={{ fontSize: isOgSaleMobile ? 22 : 18, fontWeight: 900, color: '#00ff88', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontSize: isOgSaleMobile ? 16 : 18, fontWeight: 900, color: '#00ff88', whiteSpace: 'nowrap' }}>
                                   {row.currentPrice.toFixed(2)} FLR
                                 </div>
                               </div>
@@ -7405,8 +7404,8 @@ useEffect(() => {
                                   disabled={disabled || qty <= 0}
                                   onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
                                   style={{
-                                    width: 42,
-                                    height: 42,
+                                    width: isOgSaleMobile ? 38 : 42,
+                                    height: isOgSaleMobile ? 38 : 42,
                                     borderRadius: 12,
                                     border: '1px solid rgba(255,255,255,0.18)',
                                     background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)',
@@ -7436,13 +7435,13 @@ useEffect(() => {
                                     setOgSaleCartQty(row.address, nextQty, row.inventory);
                                   }}
                                   style={{
-                                    width: isOgSaleMobile ? 92 : 70,
-                                    height: 42,
+                                    width: isOgSaleMobile ? 78 : 70,
+                                    height: isOgSaleMobile ? 38 : 42,
                                     borderRadius: 10,
                                     border: '1px solid rgba(255,255,255,0.2)',
                                     background: disabled ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.35)',
                                     color: '#fff',
-                                    fontSize: isOgSaleMobile ? 26 : 22,
+                                    fontSize: isOgSaleMobile ? 20 : 22,
                                     fontWeight: 900,
                                     textAlign: 'center',
                                     outline: 'none'
@@ -7452,8 +7451,8 @@ useEffect(() => {
                                   disabled={disabled || qty >= row.inventory}
                                   onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
                                   style={{
-                                    width: 42,
-                                    height: 42,
+                                    width: isOgSaleMobile ? 38 : 42,
+                                    height: isOgSaleMobile ? 38 : 42,
                                     borderRadius: 12,
                                     border: '1px solid rgba(0,255,136,0.45)',
                                     background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
@@ -7485,7 +7484,7 @@ useEffect(() => {
                     paddingTop: 12,
                     paddingLeft: 12,
                     paddingRight: 12,
-                    paddingBottom: isOgSaleMobile ? 'calc(10px + env(safe-area-inset-bottom, 0px))' : 12,
+                    paddingBottom: isOgSaleMobile ? 'calc(6px + env(safe-area-inset-bottom, 0px))' : 12,
                     background: 'rgba(0,0,0,0.25)',
                     flexShrink: 0
                   }}>
