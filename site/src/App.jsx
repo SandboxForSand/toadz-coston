@@ -7265,7 +7265,7 @@ useEffect(() => {
                   alignItems: isOgSaleMobile ? 'flex-start' : 'center',
                   justifyContent: 'center',
                   paddingTop: isOgSaleMobile ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : 20,
-                  paddingBottom: isOgSaleMobile ? 6 : 20,
+                  paddingBottom: isOgSaleMobile ? 10 : 20,
                   paddingLeft: isOgSaleMobile ? 10 : 20,
                   paddingRight: isOgSaleMobile ? 10 : 20,
                   overscrollBehavior: 'contain',
@@ -7478,13 +7478,13 @@ useEffect(() => {
                   </div>
 
                   <div style={{
-                    marginTop: 10,
+                    marginTop: isOgSaleMobile ? 8 : 10,
                     border: '1px solid rgba(0,255,136,0.24)',
                     borderRadius: 12,
                     paddingTop: 12,
                     paddingLeft: 12,
                     paddingRight: 12,
-                    paddingBottom: isOgSaleMobile ? 'calc(6px + env(safe-area-inset-bottom, 0px))' : 12,
+                    paddingBottom: isOgSaleMobile ? 'calc(12px + env(safe-area-inset-bottom, 0px))' : 12,
                     background: 'rgba(0,0,0,0.25)',
                     flexShrink: 0
                   }}>
