@@ -30,6 +30,34 @@ const RENTAL_MODEL_FALLBACK_DAILY_FLR = 12;
 const RENTAL_MODEL_CACHE_KEY = 'toadz_rental_model_cache_v1';
 const RENTAL_CONSERVATIVE_STAKE_FLR = 1000;
 const RENTAL_CONSERVATIVE_LOCK_MULTIPLIER = 1;
+const OG_SALE_SIM_DISCOUNT_BPS = 1000;
+const OG_SALE_SIM_BASE_ROWS = Object.freeze([
+  { address: 'sim:stoadz', label: 'sToadz', sold: 0, inventory: 127, basePrice: 15, stepPrice: 0.25, enabled: true },
+  { address: 'sim:lofts', label: 'Luxury Lofts', sold: 0, inventory: 3000, basePrice: 15, stepPrice: 0.015, enabled: true },
+  { address: 'sim:city', label: 'Songbird City', sold: 0, inventory: 3000, basePrice: 15, stepPrice: 0.015, enabled: true },
+]);
+
+const calcLinearQuoteWei = (baseWei, stepWei, soldCount, quantity) => {
+  if (quantity <= 0n) return 0n;
+  // Arithmetic progression: sum_{i=0}^{q-1} [base + step*(sold+i)]
+  return (quantity * (2n * baseWei + stepWei * (2n * soldCount + quantity - 1n))) / 2n;
+};
+
+const buildSimOgSaleRow = (raw) => {
+  const baseWei = ethers.parseEther(String(raw.basePrice));
+  const stepWei = ethers.parseEther(String(raw.stepPrice));
+  const sold = BigInt(raw.sold || 0);
+  const currentPriceWei = baseWei + (stepWei * sold);
+  return {
+    ...raw,
+    basePriceWei: baseWei.toString(),
+    stepPriceWei: stepWei.toString(),
+    currentPriceWei: currentPriceWei.toString(),
+    currentPrice: Number(ethers.formatEther(currentPriceWei))
+  };
+};
+
+const createSimOgSaleRows = () => OG_SALE_SIM_BASE_ROWS.map((row) => buildSimOgSaleRow(row));
 
 const ToadzFinal = () => {
   // Core navigation
@@ -255,6 +283,8 @@ const ToadzFinal = () => {
     bundleDiscountBps: 1000,
     error: ''
   });
+  const [ogSaleSimulationMode, setOgSaleSimulationMode] = useState(false);
+  const [ogSaleSimRows, setOgSaleSimRows] = useState(() => createSimOgSaleRows());
   const [ogSaleCart, setOgSaleCart] = useState({});
   const [ogSaleQuote, setOgSaleQuote] = useState({
     loading: false,
@@ -284,6 +314,9 @@ const ToadzFinal = () => {
     return `${needle.slice(0, 6)}...${needle.slice(-4)}`;
   };
 
+  const ogSaleRows = ogSaleSimulationMode ? ogSaleSimRows : ogSaleData.collections;
+  const ogSaleDiscountBps = ogSaleSimulationMode ? OG_SALE_SIM_DISCOUNT_BPS : (ogSaleData.bundleDiscountBps || 1000);
+
   const loadOgSaleData = async () => {
     if (!CONTRACTS.OGSale) {
       setOgSaleData({
@@ -294,6 +327,9 @@ const ToadzFinal = () => {
         bundleDiscountBps: 1000,
         error: 'OG sale contract not configured yet'
       });
+      setOgSaleSimulationMode(true);
+      setOgSaleSimRows(createSimOgSaleRows());
+      setOgSaleCart({});
       return;
     }
 
@@ -315,6 +351,8 @@ const ToadzFinal = () => {
           inventory: Number(info.inventory || 0),
           basePrice: Number(ethers.formatEther(info.basePriceWei || 0n)),
           stepPrice: Number(ethers.formatEther(info.stepPriceWei || 0n)),
+          basePriceWei: (info.basePriceWei || 0n).toString(),
+          stepPriceWei: (info.stepPriceWei || 0n).toString(),
           currentPrice: Number(ethers.formatEther(currentPriceWei)),
           currentPriceWei: currentPriceWei.toString()
         });
@@ -342,6 +380,12 @@ const ToadzFinal = () => {
         bundleDiscountBps,
         error: ''
       });
+      const enabledWithInventory = rows.filter((row) => row.enabled && row.inventory > 0).length;
+      const shouldAutoSimulate = rows.length < 3 || enabledWithInventory < 2;
+      setOgSaleSimulationMode(shouldAutoSimulate);
+      if (shouldAutoSimulate) {
+        setOgSaleSimRows(createSimOgSaleRows());
+      }
       setOgSaleCart({});
     } catch (err) {
       setOgSaleData({
@@ -352,6 +396,8 @@ const ToadzFinal = () => {
         bundleDiscountBps: 1000,
         error: getReadableError(err)
       });
+      setOgSaleSimulationMode(true);
+      setOgSaleSimRows(createSimOgSaleRows());
     } finally {
       setOgSaleLoading(false);
     }
@@ -359,7 +405,7 @@ const ToadzFinal = () => {
 
   const buildOgSaleCartCollections = () => {
     const expanded = [];
-    for (const row of ogSaleData.collections) {
+    for (const row of ogSaleRows) {
       const rawQty = Number(ogSaleCart[row.address] || 0);
       const qty = Math.max(0, Math.min(Number(row.inventory || 0), Math.floor(rawQty)));
       for (let i = 0; i < qty; i++) expanded.push(row.address);
@@ -382,14 +428,14 @@ const ToadzFinal = () => {
     let cancelled = false;
 
     const loadCartQuote = async () => {
-      if (!showOgSaleModal || !CONTRACTS.OGSale) {
+      if (!showOgSaleModal) {
         if (!cancelled) {
           setOgSaleQuote({
             loading: false,
             count: 0,
             rawWei: '0',
             discountedWei: '0',
-            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            discountBps: ogSaleDiscountBps,
             error: ''
           });
         }
@@ -397,7 +443,7 @@ const ToadzFinal = () => {
       }
 
       const expanded = [];
-      for (const row of ogSaleData.collections) {
+      for (const row of ogSaleRows) {
         const rawQty = Number(ogSaleCart[row.address] || 0);
         const qty = Math.max(0, Math.min(Number(row.inventory || 0), Math.floor(rawQty)));
         for (let i = 0; i < qty; i++) expanded.push(row.address);
@@ -411,7 +457,7 @@ const ToadzFinal = () => {
             count: 0,
             rawWei: '0',
             discountedWei: '0',
-            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            discountBps: ogSaleDiscountBps,
             error: ''
           });
         }
@@ -428,19 +474,37 @@ const ToadzFinal = () => {
       }
 
       try {
-        const readProvider = getReadProvider();
-        const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, readProvider);
-        const discountBps = Number(await sale.bundleDiscountBps().catch(() => ogSaleData.bundleDiscountBps || 1000));
-
         let rawWei;
         let discountedWei;
-        if (count === 1) {
-          rawWei = await sale.quoteBuy(expanded[0], 1);
-          discountedWei = rawWei;
+        let discountBps = ogSaleDiscountBps;
+
+        if (ogSaleSimulationMode) {
+          rawWei = 0n;
+          for (const row of ogSaleRows) {
+            const qty = Math.max(0, Math.min(Number(row.inventory || 0), Math.floor(Number(ogSaleCart[row.address] || 0))));
+            if (qty <= 0) continue;
+            const baseWei = BigInt(row.basePriceWei || ethers.parseEther(String(row.basePrice || 0)).toString());
+            const stepWei = BigInt(row.stepPriceWei || ethers.parseEther(String(row.stepPrice || 0)).toString());
+            const sold = BigInt(row.sold || 0);
+            const q = BigInt(qty);
+            rawWei += calcLinearQuoteWei(baseWei, stepWei, sold, q);
+          }
+          discountedWei = count >= 2
+            ? (rawWei * BigInt(10_000 - discountBps)) / 10_000n
+            : rawWei;
         } else {
-          const quote = await sale.quoteBundle(expanded);
-          rawWei = quote.rawPrice;
-          discountedWei = quote.discountedPrice;
+          if (!CONTRACTS.OGSale) throw new Error('OG sale not configured');
+          const readProvider = getReadProvider();
+          const sale = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, readProvider);
+          discountBps = Number(await sale.bundleDiscountBps().catch(() => ogSaleDiscountBps));
+          if (count === 1) {
+            rawWei = await sale.quoteBuy(expanded[0], 1);
+            discountedWei = rawWei;
+          } else {
+            const quote = await sale.quoteBundle(expanded);
+            rawWei = quote.rawPrice;
+            discountedWei = quote.discountedPrice;
+          }
         }
 
         if (!cancelled) {
@@ -460,7 +524,7 @@ const ToadzFinal = () => {
             count,
             rawWei: '0',
             discountedWei: '0',
-            discountBps: ogSaleData.bundleDiscountBps || 1000,
+            discountBps: ogSaleDiscountBps,
             error: getReadableError(err)
           });
         }
@@ -471,9 +535,39 @@ const ToadzFinal = () => {
     return () => {
       cancelled = true;
     };
-  }, [showOgSaleModal, ogSaleData.collections, ogSaleData.bundleDiscountBps, ogSaleCart]);
+  }, [showOgSaleModal, ogSaleRows, ogSaleDiscountBps, ogSaleCart, ogSaleSimulationMode]);
 
   const handleBuyOgCart = async () => {
+    const expanded = buildOgSaleCartCollections();
+    if (expanded.length === 0) {
+      showToast('error', 'Select at least 1 NFT');
+      return;
+    }
+
+    if (ogSaleSimulationMode) {
+      const counts = expanded.reduce((acc, address) => {
+        acc[address] = (acc[address] || 0) + 1;
+        return acc;
+      }, {});
+
+      setOgSaleSimRows((prev) =>
+        prev.map((row) => {
+          const qty = Number(counts[row.address] || 0);
+          if (qty <= 0) return row;
+          const nextInventory = Math.max(0, row.inventory - qty);
+          const nextSold = row.sold + qty;
+          return buildSimOgSaleRow({
+            ...row,
+            sold: nextSold,
+            inventory: nextInventory
+          });
+        })
+      );
+      setOgSaleCart({});
+      showToast('success', `Preview checkout complete: ${expanded.length} NFT${expanded.length === 1 ? '' : 's'}`);
+      return;
+    }
+
     if (!window.ethereum) {
       showToast('error', 'Wallet not found');
       return;
@@ -483,14 +577,25 @@ const ToadzFinal = () => {
       return;
     }
 
-    const expanded = buildOgSaleCartCollections();
-    if (expanded.length === 0) {
-      showToast('error', 'Select at least 1 NFT');
-      return;
-    }
-
     setOgSaleBuying(true);
     try {
+      const selectedCounts = expanded.reduce((acc, address) => {
+        acc[address] = (acc[address] || 0) + 1;
+        return acc;
+      }, {});
+      const rowByAddress = new Map(ogSaleRows.map((row) => [row.address.toLowerCase(), row]));
+      const readProvider = getReadProvider();
+      const saleRead = new ethers.Contract(CONTRACTS.OGSale, ABIS.OGSale, readProvider);
+      for (const [collectionAddress, qty] of Object.entries(selectedCounts)) {
+        const info = await saleRead.getCollectionInfo(collectionAddress);
+        const available = Number(info.inventory || 0);
+        if (qty > available) {
+          const label = rowByAddress.get(collectionAddress.toLowerCase())?.label || getOgCollectionLabel(collectionAddress);
+          setOgSaleCartQty(collectionAddress, available, available);
+          throw new Error(`${label}: only ${available} left in inventory`);
+        }
+      }
+
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
       if (chainId !== COSTON2_CHAIN.chainId) {
         await window.ethereum.request({
@@ -7162,21 +7267,69 @@ useEffect(() => {
 
                   {ogSaleLoading ? (
                     <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Loading sale inventory...</div>
-                  ) : ogSaleData.error ? (
-                    <div style={{
-                      fontSize: 12,
-                      color: '#ff9a9a',
-                      background: 'rgba(255,80,80,0.08)',
-                      border: '1px solid rgba(255,80,80,0.22)',
-                      borderRadius: 10,
-                      padding: 10
-                    }}>
-                      {ogSaleData.error}
-                    </div>
                   ) : (
                     <>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 10,
+                        marginBottom: 12,
+                        fontSize: 11,
+                        color: ogSaleSimulationMode ? '#fbbf24' : 'rgba(255,255,255,0.65)'
+                      }}>
+                        <div>
+                          {ogSaleSimulationMode ? 'Simulation mode: previewing 3-collection inventory and checkout flow.' : 'Live mode: reading on-chain sale inventory.'}
+                        </div>
+                        <button
+                          onClick={() => setOgSaleSimulationMode((prev) => !prev)}
+                          disabled={!ogSaleSimulationMode && ogSaleData.collections.length === 0}
+                          style={{
+                            borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,0.16)',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: '#fff',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: (!ogSaleSimulationMode && ogSaleData.collections.length === 0) ? 'not-allowed' : 'pointer',
+                            opacity: (!ogSaleSimulationMode && ogSaleData.collections.length === 0) ? 0.45 : 1
+                          }}
+                        >
+                          {ogSaleSimulationMode ? 'Use Live Data' : 'Use Simulation'}
+                        </button>
+                      </div>
+
+                      {ogSaleData.error && !ogSaleSimulationMode && (
+                        <div style={{
+                          fontSize: 12,
+                          color: '#ff9a9a',
+                          background: 'rgba(255,80,80,0.08)',
+                          border: '1px solid rgba(255,80,80,0.22)',
+                          borderRadius: 10,
+                          padding: 10,
+                          marginBottom: 12
+                        }}>
+                          {ogSaleData.error}
+                        </div>
+                      )}
+
+                      {ogSaleData.error && ogSaleSimulationMode && (
+                        <div style={{
+                          fontSize: 12,
+                          color: '#fbbf24',
+                          background: 'rgba(251,191,36,0.08)',
+                          border: '1px solid rgba(251,191,36,0.26)',
+                          borderRadius: 10,
+                          padding: 10,
+                          marginBottom: 12
+                        }}>
+                          Live data issue: {ogSaleData.error}
+                        </div>
+                      )}
+
                       <div style={{ display: 'grid', gap: 10 }}>
-                        {ogSaleData.collections.map((row) => {
+                        {ogSaleRows.map((row) => {
                           const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying || ogSaleLoading;
                           const qty = Number(ogSaleCart[row.address] || 0);
                           return (
@@ -7248,6 +7401,11 @@ useEffect(() => {
                             </div>
                           );
                         })}
+                        {ogSaleRows.length === 0 && (
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                            No sale collections available.
+                          </div>
+                        )}
                       </div>
 
                       <div style={{
@@ -7261,7 +7419,7 @@ useEffect(() => {
                           Cart ({ogSaleQuote.count} NFT{ogSaleQuote.count === 1 ? '' : 's'})
                         </div>
                         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>
-                          Buy 2+ to unlock {((ogSaleData.bundleDiscountBps || 1000) / 100).toFixed(0)}% discount (any mix, including same collection).
+                          Buy 2+ to unlock {(ogSaleDiscountBps / 100).toFixed(0)}% discount (any mix, including same collection).
                         </div>
 
                         {ogSaleQuote.error ? (
