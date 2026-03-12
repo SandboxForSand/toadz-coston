@@ -317,10 +317,13 @@ const ToadzFinal = () => {
 
   const ogSaleRows = ogSaleSimulationMode ? ogSaleSimRows : ogSaleData.collections;
   const ogSaleDiscountBps = ogSaleSimulationMode ? OG_SALE_SIM_DISCOUNT_BPS : (ogSaleData.bundleDiscountBps || 1000);
-  const ogSaleCurrentCount = Number(ogSaleQuote.count || 0);
-  const ogSaleCurrentTarget = [...OG_SALE_BULK_TARGETS].reverse().find((target) => ogSaleCurrentCount >= target) || 0;
-  const ogSaleNextTarget = OG_SALE_BULK_TARGETS.find((target) => target > ogSaleCurrentCount) || null;
-  const ogSaleToNextTarget = ogSaleNextTarget ? Math.max(0, ogSaleNextTarget - ogSaleCurrentCount) : 0;
+  const ogSaleRawWei = BigInt(ogSaleQuote.rawWei || '0');
+  const ogSaleDiscountedWei = BigInt(ogSaleQuote.discountedWei || '0');
+  const ogSaleSavingsWei = ogSaleRawWei > ogSaleDiscountedWei ? (ogSaleRawWei - ogSaleDiscountedWei) : 0n;
+  const ogSaleOwedFlr = Number(ethers.formatEther(ogSaleDiscountedWei));
+  const ogSaleSavingsFlr = Number(ethers.formatEther(ogSaleSavingsWei));
+  const ogSaleOwedDisplay = ogSaleQuote.count > 0 ? ogSaleOwedFlr.toFixed(2) : '0';
+  const ogSaleSavingsDisplay = ogSaleQuote.count > 0 ? ogSaleSavingsFlr.toFixed(2) : '0';
 
   const loadOgSaleData = async () => {
     if (!CONTRACTS.OGSale) {
@@ -7268,16 +7271,36 @@ useEffect(() => {
                     >×</button>
                   </div>
                   <div style={{
-                    fontSize: 13,
-                    color: '#fef08a',
                     marginBottom: 12,
-                    padding: '8px 10px',
-                    borderRadius: 10,
-                    border: '1px solid rgba(250,204,21,0.28)',
-                    background: 'rgba(250,204,21,0.08)',
-                    fontWeight: 700
+                    padding: '14px 12px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(250,204,21,0.34)',
+                    background: 'linear-gradient(135deg, rgba(250,204,21,0.14) 0%, rgba(250,204,21,0.05) 100%)'
                   }}>
-                    Bulk discounts! Targets: 5 • 10 • 20 • 50 • 100
+                    <div style={{ fontSize: 18, fontWeight: 900, color: '#fef08a', lineHeight: 1.1, marginBottom: 4 }}>
+                      Bulk discounts
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.84)', marginBottom: 8 }}>
+                      Bigger checkout size unlocks bigger savings.
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {OG_SALE_BULK_TARGETS.map((target) => (
+                        <div
+                          key={`bulk-target-${target}`}
+                          style={{
+                            borderRadius: 999,
+                            border: '1px solid rgba(250,204,21,0.35)',
+                            background: 'rgba(250,204,21,0.14)',
+                            color: '#fef08a',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '3px 8px'
+                          }}
+                        >
+                          {target}+
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div style={{ flex: 1, overflowY: 'auto', paddingRight: 2 }}>
@@ -7373,63 +7396,22 @@ useEffect(() => {
                     padding: 12,
                     background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.12) 100%)'
                   }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>
-                      {ogSaleQuote.count > 0 ? `You picked ${ogSaleQuote.count}` : 'Pick your OGs'}
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>
+                      {ogSaleQuote.count > 0 ? `Cart (${ogSaleQuote.count})` : 'Cart (0)'}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                      {OG_SALE_BULK_TARGETS.map((target) => {
-                        const hit = ogSaleCurrentCount >= target;
-                        const active = ogSaleNextTarget === target;
-                        return (
-                          <div
-                            key={target}
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: 999,
-                              border: hit
-                                ? '1px solid rgba(0,255,136,0.55)'
-                                : (active
-                                  ? '1px solid rgba(250,204,21,0.5)'
-                                  : '1px solid rgba(255,255,255,0.16)'),
-                              background: hit
-                                ? 'rgba(0,255,136,0.12)'
-                                : (active
-                                  ? 'rgba(250,204,21,0.14)'
-                                  : 'rgba(255,255,255,0.05)'),
-                              color: hit ? '#00ff88' : (active ? '#fef08a' : 'rgba(255,255,255,0.72)'),
-                              fontSize: 11,
-                              fontWeight: 700
-                            }}
-                          >
-                            {target}
-                          </div>
-                        );
-                      })}
+                    <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total FLR owed</span>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#00ff88' }}>{ogSaleOwedDisplay} FLR</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.74)' }}>Total discount achieved</span>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#00ff88' }}>{ogSaleSavingsDisplay} FLR</span>
+                      </div>
                     </div>
-                    {ogSaleCurrentCount > 0 && ogSaleNextTarget && (
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.76)', marginBottom: 6 }}>
-                        Add {ogSaleToNextTarget} more to hit {ogSaleNextTarget}.
-                      </div>
-                    )}
-                    {ogSaleCurrentCount > 0 && !ogSaleNextTarget && (
-                      <div style={{ fontSize: 12, color: '#00ff88', marginBottom: 6 }}>
-                        Max target reached.
-                      </div>
-                    )}
                     {ogSaleQuote.error ? (
                       <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 8 }}>{ogSaleQuote.error}</div>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: '#00ff88', lineHeight: 1.1 }}>
-                          {Number(ethers.formatEther(ogSaleQuote.discountedWei || '0')).toFixed(2)} FLR
-                        </div>
-                        {ogSaleQuote.count >= 2 && (
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 4 }}>
-                            You save {Number(ethers.formatEther((BigInt(ogSaleQuote.rawWei || '0') - BigInt(ogSaleQuote.discountedWei || '0')).toString())).toFixed(2)} FLR
-                          </div>
-                        )}
-                      </>
-                    )}
+                    ) : null}
                     <button
                       disabled={ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0}
                       onClick={handleBuyOgCart}
@@ -7451,7 +7433,7 @@ useEffect(() => {
                       {ogSaleBuying
                         ? 'Processing...'
                         : (ogSaleQuote.count > 0
-                          ? (ogSaleNextTarget ? `Buy Now (Next: ${ogSaleNextTarget})` : 'Buy Mega Bundle')
+                          ? `Buy ${ogSaleQuote.count}`
                           : 'Pick OGs')}
                     </button>
                   </div>
