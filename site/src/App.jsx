@@ -7237,17 +7237,18 @@ useEffect(() => {
                   onClick={(e) => e.stopPropagation()}
                   style={{
                     width: '100%',
-                    maxWidth: 460,
-                    maxHeight: '85vh',
-                    overflowY: 'auto',
+                    maxWidth: 500,
+                    height: 'min(86vh, 640px)',
                     background: '#0d0d12',
                     border: '1px solid rgba(168,85,247,0.25)',
                     borderRadius: 16,
-                    padding: 20
+                    padding: 18,
+                    display: 'flex',
+                    flexDirection: 'column'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>Buy OG NFTs</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>Buy OGs</div>
                     <button
                       onClick={() => setShowOgSaleModal(false)}
                       style={{
@@ -7261,208 +7262,154 @@ useEffect(() => {
                       }}
                     >×</button>
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-                    Testnet preview: add quantities per collection. Discount starts at 2+ NFTs in any mix.
+                  <div style={{
+                    fontSize: 13,
+                    color: '#fef08a',
+                    marginBottom: 12,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(250,204,21,0.28)',
+                    background: 'rgba(250,204,21,0.08)',
+                    fontWeight: 700
+                  }}>
+                    Bulk discounts! Buy 2+ and save {(ogSaleDiscountBps / 100).toFixed(0)}%
                   </div>
 
-                  {ogSaleLoading ? (
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Loading sale inventory...</div>
-                  ) : (
-                    <>
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 10,
-                        marginBottom: 12,
-                        fontSize: 11,
-                        color: ogSaleSimulationMode ? '#fbbf24' : 'rgba(255,255,255,0.65)'
-                      }}>
-                        <div>
-                          {ogSaleSimulationMode ? 'Simulation mode: previewing 3-collection inventory and checkout flow.' : 'Live mode: reading on-chain sale inventory.'}
-                        </div>
-                        <button
-                          onClick={() => setOgSaleSimulationMode((prev) => !prev)}
-                          disabled={!ogSaleSimulationMode && ogSaleData.collections.length === 0}
-                          style={{
-                            borderRadius: 8,
-                            border: '1px solid rgba(255,255,255,0.16)',
-                            background: 'rgba(255,255,255,0.06)',
-                            color: '#fff',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: (!ogSaleSimulationMode && ogSaleData.collections.length === 0) ? 'not-allowed' : 'pointer',
-                            opacity: (!ogSaleSimulationMode && ogSaleData.collections.length === 0) ? 0.45 : 1
-                          }}
-                        >
-                          {ogSaleSimulationMode ? 'Use Live Data' : 'Use Simulation'}
-                        </button>
-                      </div>
-
-                      {ogSaleData.error && !ogSaleSimulationMode && (
-                        <div style={{
-                          fontSize: 12,
-                          color: '#ff9a9a',
-                          background: 'rgba(255,80,80,0.08)',
-                          border: '1px solid rgba(255,80,80,0.22)',
-                          borderRadius: 10,
-                          padding: 10,
-                          marginBottom: 12
-                        }}>
-                          {ogSaleData.error}
-                        </div>
-                      )}
-
-                      {ogSaleData.error && ogSaleSimulationMode && (
-                        <div style={{
-                          fontSize: 12,
-                          color: '#fbbf24',
-                          background: 'rgba(251,191,36,0.08)',
-                          border: '1px solid rgba(251,191,36,0.26)',
-                          borderRadius: 10,
-                          padding: 10,
-                          marginBottom: 12
-                        }}>
-                          Live data issue: {ogSaleData.error}
-                        </div>
-                      )}
-
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: 2 }}>
+                    {ogSaleLoading ? (
+                      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>Loading OG shop...</div>
+                    ) : (
                       <div style={{ display: 'grid', gap: 10 }}>
                         {ogSaleRows.map((row) => {
                           const disabled = !row.enabled || row.inventory <= 0 || ogSaleBuying || ogSaleLoading;
                           const qty = Number(ogSaleCart[row.address] || 0);
+                          const lowerLabel = String(row.label || '').toLowerCase();
+                          const icon = lowerLabel.includes('loft') ? '🏢' : (lowerLabel.includes('city') ? '🌆' : '🐸');
                           return (
                             <div
                               key={row.address}
                               style={{
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: 10,
+                                border: '1px solid rgba(255,255,255,0.09)',
+                                borderRadius: 12,
                                 padding: 12,
-                                background: disabled ? 'rgba(255,255,255,0.02)' : 'rgba(0,255,136,0.05)'
+                                background: 'linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,255,136,0.02) 100%)'
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                  <div style={{ fontSize: 14, fontWeight: 700 }}>{row.label}</div>
-                                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                                    Inventory {row.inventory} • Sold {row.sold}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 18 }}>{icon}</span>
+                                  <div>
+                                    <div style={{ fontSize: 16, fontWeight: 800 }}>{row.label}</div>
+                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                                      {row.inventory > 0 ? `${row.inventory} left` : 'Sold out'}
+                                    </div>
                                   </div>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: 14, fontWeight: 700, color: '#00ff88' }}>
-                                    {row.currentPrice.toFixed(3)} FLR
-                                  </div>
-                                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>current curve price</div>
+                                <div style={{ fontSize: 18, fontWeight: 900, color: '#00ff88' }}>
+                                  {row.currentPrice.toFixed(2)} FLR
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Quantity</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <button
-                                    disabled={disabled || qty <= 0}
-                                    onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: 6,
-                                      border: '1px solid rgba(255,255,255,0.16)',
-                                      background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.12)',
-                                      color: (disabled || qty <= 0) ? 'rgba(255,255,255,0.35)' : '#fff',
-                                      fontWeight: 700,
-                                      cursor: (disabled || qty <= 0) ? 'not-allowed' : 'pointer'
-                                    }}
-                                  >-</button>
-                                  <div style={{
-                                    minWidth: 26,
-                                    textAlign: 'center',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: qty > 0 ? '#00ff88' : 'rgba(255,255,255,0.6)'
-                                  }}>
-                                    {qty}
-                                  </div>
-                                  <button
-                                    disabled={disabled || qty >= row.inventory}
-                                    onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
-                                    style={{
-                                      width: 28,
-                                      height: 28,
-                                      borderRadius: 6,
-                                      border: '1px solid rgba(255,255,255,0.16)',
-                                      background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
-                                      color: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.35)' : '#00ff88',
-                                      fontWeight: 700,
-                                      cursor: (disabled || qty >= row.inventory) ? 'not-allowed' : 'pointer'
-                                    }}
-                                  >+</button>
+
+                              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+                                <button
+                                  disabled={disabled || qty <= 0}
+                                  onClick={() => setOgSaleCartQty(row.address, qty - 1, row.inventory)}
+                                  style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: 10,
+                                    border: '1px solid rgba(255,255,255,0.18)',
+                                    background: (disabled || qty <= 0) ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.14)',
+                                    color: (disabled || qty <= 0) ? 'rgba(255,255,255,0.35)' : '#fff',
+                                    fontSize: 18,
+                                    fontWeight: 800,
+                                    cursor: (disabled || qty <= 0) ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  -
+                                </button>
+                                <div style={{ minWidth: 26, textAlign: 'center', fontSize: 20, fontWeight: 900, color: '#00ff88' }}>
+                                  {qty}
                                 </div>
+                                <button
+                                  disabled={disabled || qty >= row.inventory}
+                                  onClick={() => setOgSaleCartQty(row.address, qty + 1, row.inventory)}
+                                  style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: 10,
+                                    border: '1px solid rgba(0,255,136,0.45)',
+                                    background: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.06)' : 'rgba(0,255,136,0.2)',
+                                    color: (disabled || qty >= row.inventory) ? 'rgba(255,255,255,0.35)' : '#00ff88',
+                                    fontSize: 18,
+                                    fontWeight: 800,
+                                    cursor: (disabled || qty >= row.inventory) ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  +
+                                </button>
                               </div>
                             </div>
                           );
                         })}
                         {ogSaleRows.length === 0 && (
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                            No sale collections available.
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                            OG shop unavailable.
                           </div>
                         )}
                       </div>
+                    )}
+                  </div>
 
-                      <div style={{
-                        marginTop: 14,
-                        border: '1px solid rgba(168,85,247,0.25)',
+                  <div style={{
+                    marginTop: 12,
+                    border: '1px solid rgba(168,85,247,0.32)',
+                    borderRadius: 12,
+                    padding: 12,
+                    background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.12) 100%)'
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>
+                      {ogSaleQuote.count > 0 ? `You picked ${ogSaleQuote.count}` : 'Pick your OGs'}
+                    </div>
+                    {ogSaleQuote.error ? (
+                      <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 8 }}>{ogSaleQuote.error}</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: '#00ff88', lineHeight: 1.1 }}>
+                          {Number(ethers.formatEther(ogSaleQuote.discountedWei || '0')).toFixed(2)} FLR
+                        </div>
+                        {ogSaleQuote.count >= 2 && (
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 4 }}>
+                            You save {Number(ethers.formatEther((BigInt(ogSaleQuote.rawWei || '0') - BigInt(ogSaleQuote.discountedWei || '0')).toString())).toFixed(2)} FLR
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <button
+                      disabled={ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0}
+                      onClick={handleBuyOgCart}
+                      style={{
+                        width: '100%',
+                        marginTop: 10,
                         borderRadius: 10,
-                        padding: 12,
-                        background: 'rgba(168,85,247,0.07)'
-                      }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
-                          Cart ({ogSaleQuote.count} NFT{ogSaleQuote.count === 1 ? '' : 's'})
-                        </div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>
-                          Buy 2+ to unlock {(ogSaleDiscountBps / 100).toFixed(0)}% discount (any mix, including same collection).
-                        </div>
-
-                        {ogSaleQuote.error ? (
-                          <div style={{ fontSize: 12, color: '#ff9a9a', marginBottom: 10 }}>{ogSaleQuote.error}</div>
-                        ) : ogSaleQuote.count > 0 ? (
-                          <>
-                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 2 }}>
-                              Curve total: {Number(ethers.formatEther(ogSaleQuote.rawWei || '0')).toFixed(3)} FLR
-                            </div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#00ff88', marginBottom: 10 }}>
-                              Final price: {Number(ethers.formatEther(ogSaleQuote.discountedWei || '0')).toFixed(3)} FLR
-                            </div>
-                            {ogSaleQuote.count >= 2 && (
-                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
-                                You save {Number(ethers.formatEther((BigInt(ogSaleQuote.rawWei || '0') - BigInt(ogSaleQuote.discountedWei || '0')).toString())).toFixed(3)} FLR
-                              </div>
-                            )}
-                            <button
-                              disabled={ogSaleBuying || ogSaleQuote.loading}
-                              onClick={handleBuyOgCart}
-                              style={{
-                                width: '100%',
-                                borderRadius: 8,
-                                border: (ogSaleBuying || ogSaleQuote.loading) ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                                background: (ogSaleBuying || ogSaleQuote.loading) ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #a855f7, #ec4899)',
-                                color: '#fff',
-                                padding: '10px 12px',
-                                fontSize: 12,
-                                fontWeight: 700,
-                                cursor: (ogSaleBuying || ogSaleQuote.loading) ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              {ogSaleBuying ? 'Processing...' : (ogSaleQuote.count >= 2 ? `Buy ${ogSaleQuote.count} with Discount` : 'Buy 1')}
-                            </button>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                            Select quantity to continue.
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
+                        border: (ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0) ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                        background: (ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0)
+                          ? 'rgba(255,255,255,0.08)'
+                          : 'linear-gradient(135deg, #a855f7, #ec4899)',
+                        color: '#fff',
+                        padding: '12px 12px',
+                        fontSize: 15,
+                        fontWeight: 800,
+                        cursor: (ogSaleBuying || ogSaleQuote.loading || ogSaleQuote.count === 0) ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {ogSaleBuying
+                        ? 'Processing...'
+                        : (ogSaleQuote.count >= 2
+                          ? `Buy & Save ${(ogSaleDiscountBps / 100).toFixed(0)}%`
+                          : (ogSaleQuote.count === 1 ? 'Buy 1 OG' : 'Pick OGs'))}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
