@@ -3098,7 +3098,7 @@ useEffect(() => {
 
   const poolEarningsPreview = estimatePoolEarnings(fomoFlrExtra);
   const currentBoostValue = parseFloat(user.weight) || 1;
-  const projectedBoostValue = Math.min(5, currentBoostValue + fomoBoostExtra);
+  const projectedBoostValue = currentBoostValue + fomoBoostExtra;
   const boostEarningsPreview = currentBoostValue > 0
     ? ((user.totalEarned / currentBoostValue) * projectedBoostValue)
     : user.totalEarned;
