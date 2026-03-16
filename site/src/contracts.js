@@ -177,7 +177,7 @@ export const ABIS = {
 
 // Lock tier config (matches contract)
 export const LOCK_TIERS = [
-  { days: '1d', duration: 86400, multiplier: 1.0 },
-  { days: '2d', duration: 172800, multiplier: 2.0 },
-  { days: '7d', duration: 604800, multiplier: 4.0 },
+  { days: '14d', duration: 1209600, multiplier: 1.0 },
+  { days: '28d', duration: 2419200, multiplier: 2.0 },
+  { days: '56d', duration: 4838400, multiplier: 4.0 },
 ];
