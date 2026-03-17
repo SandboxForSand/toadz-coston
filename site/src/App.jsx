@@ -10,7 +10,7 @@ const EMPTY_MERKLE_TREE = Object.freeze({
   merkleRoot: `0x${'0'.repeat(64)}`
 });
 const WALLETCONNECT_PROJECT_ID =
-  (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'c4f79cc821944d9680842e34466bfbd').trim();
+  (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '5c72bc77d325e63338c0450b18d9174d').trim();
 const WALLETCONNECT_METHOD_KEY = 'toadz_wallet_method';
 
 // Boost-eligible collections (Flare only for now)
