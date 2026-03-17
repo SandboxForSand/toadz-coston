@@ -9,6 +9,9 @@ const EMPTY_MERKLE_TREE = Object.freeze({
   proofs: {},
   merkleRoot: `0x${'0'.repeat(64)}`
 });
+const WALLETCONNECT_PROJECT_ID =
+  (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'c4f79cc821944d9680842e34466bfbd').trim();
+const WALLETCONNECT_METHOD_KEY = 'toadz_wallet_method';
 
 // Boost-eligible collections (Flare only for now)
 const BOOST_COLLECTIONS = [
@@ -97,6 +100,7 @@ const ToadzFinal = () => {
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
+  const [walletConnectProvider, setWalletConnectProvider] = useState(null);
   
   // Mint page - Fox Girls drops in 30 days
   const [isLive, setIsLive] = useState(false);
@@ -1465,60 +1469,131 @@ const syncToFlare = async () => {
   setSyncPending(false);
 };
 
-  // Wallet connection
-  const connectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      showToast('error', 'Please install MetaMask or another Web3 wallet');
-      return;
+  const initializeConnectedWallet = async ({ address, web3Provider, web3Signer, method, wcProvider = null }) => {
+    setWalletAddress(address);
+    setConnected(true);
+    setCurrentNetwork('flare');
+    setProvider(web3Provider);
+    setSigner(web3Signer);
+    setWalletConnectProvider(wcProvider);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(WALLETCONNECT_METHOD_KEY, method);
     }
-    
+
+    // Get native balance + WFLR balance (show combined available)
+    const nativeBalance = await web3Provider.getBalance(address);
+    const wflrContract = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
+    const wflrBalance = await wflrContract.balanceOf(address);
+    setWalletBalance(Number(ethers.formatEther(nativeBalance + wflrBalance)));
+
+    // Setup contracts
+    const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
+    const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
+    const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
+    const boostRegistry = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.BoostRegistry, web3Signer);
+    const ogVault = CONTRACTS.OGVault ? new ethers.Contract(CONTRACTS.OGVault, ABIS.OGVault, web3Signer) : null;
+    const tadzClaimer = CONTRACTS.TadzClaimer ? new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, web3Signer) : null;
+    const toadzMint = CONTRACTS.ToadzMint ? new ethers.Contract(CONTRACTS.ToadzMint, ABIS.ToadzMint, web3Signer) : null;
+
+    const nextContracts = { toadzStake, pond, wflr, boostRegistry, ogVault, tadzClaimer, toadzMint };
+    setContracts(nextContracts);
+    await loadUserData(address, nextContracts);
+  };
+
+  const connectInjectedWallet = async (requestAccounts = true) => {
+    if (typeof window.ethereum === 'undefined') return false;
+
     try {
-      // Request accounts first
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (!accounts || accounts.length === 0) {
-        showToast('error', 'No accounts found. Please unlock your wallet.');
-        return;
-      }
-      
-      // Then switch network
+      const method = requestAccounts ? 'eth_requestAccounts' : 'eth_accounts';
+      const accounts = await window.ethereum.request({ method });
+      if (!accounts || accounts.length === 0) return false;
+
       await switchToFlare();
-      
-      // Small delay for wallet to settle after network switch
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const address = accounts[0];
-      setWalletAddress(address);
-      setConnected(true);
-      
-      // Setup ethers provider and signer
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
       const web3Provider = new ethers.BrowserProvider(window.ethereum);
       const web3Signer = await web3Provider.getSigner();
-      setProvider(web3Provider);
-      setSigner(web3Signer);
-      
-      // Get native balance + WFLR balance (show combined available)
-      const nativeBalance = await web3Provider.getBalance(address);
-      const wflrContract = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
-      const wflrBalance = await wflrContract.balanceOf(address);
-      setWalletBalance(Number(ethers.formatEther(nativeBalance + wflrBalance)));
-      
-      // Setup contracts
-      const toadzStake = new ethers.Contract(CONTRACTS.ToadzStake, ABIS.ToadzStake, web3Signer);
-      const pond = new ethers.Contract(CONTRACTS.POND, ABIS.POND, web3Signer);
-      const wflr = new ethers.Contract(CONTRACTS.WFLR, ABIS.WFLR, web3Signer);
-      const boostRegistry = new ethers.Contract(CONTRACTS.BoostRegistry, ABIS.BoostRegistry, web3Signer);
-      const ogVault = CONTRACTS.OGVault ? new ethers.Contract(CONTRACTS.OGVault, ABIS.OGVault, web3Signer) : null;
-      const tadzClaimer = CONTRACTS.TadzClaimer ? new ethers.Contract(CONTRACTS.TadzClaimer, ABIS.TadzClaimer, web3Signer) : null;
-      const toadzMint = CONTRACTS.ToadzMint ? new ethers.Contract(CONTRACTS.ToadzMint, ABIS.ToadzMint, web3Signer) : null;
-
-      setContracts({ toadzStake, pond, wflr, boostRegistry, ogVault, tadzClaimer, toadzMint });
-
-      // Load user data
-      await loadUserData(address, { toadzStake, pond, wflr, boostRegistry, ogVault, tadzClaimer, toadzMint });
-      
+      const address = accounts[0];
+      await initializeConnectedWallet({
+        address,
+        web3Provider,
+        web3Signer,
+        method: 'injected',
+        wcProvider: null
+      });
+      return true;
     } catch (err) {
-      console.error('Wallet connection failed:', err);
-      showToast('error', 'Connection failed: ' + (err.message || 'Unknown error'));
+      if (requestAccounts) {
+        console.error('Injected wallet connection failed:', err);
+        showToast('error', 'Connection failed: ' + (err.message || 'Unknown error'));
+      }
+      return false;
+    }
+  };
+
+  const connectWalletConnect = async (silent = false) => {
+    try {
+      if (!WALLETCONNECT_PROJECT_ID) {
+        showToast('error', 'WalletConnect is not configured on this build');
+        return false;
+      }
+
+      const { default: EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2.22.4');
+      const chainIdDec = parseInt(COSTON2_CHAIN.chainId, 16);
+      const wcProvider = await EthereumProvider.init({
+        projectId: WALLETCONNECT_PROJECT_ID,
+        chains: [chainIdDec],
+        optionalChains: [chainIdDec],
+        rpcMap: { [chainIdDec]: COSTON2_CHAIN.rpcUrls[0] },
+        showQrModal: !silent,
+        metadata: {
+          name: 'ToadzStake',
+          description: 'ToadzStake Coston2 testnet',
+          url: typeof window !== 'undefined' ? window.location.origin : 'https://sandboxforsand.github.io',
+          icons: ['https://sandboxforsand.github.io/favicon.ico']
+        }
+      });
+
+      if (silent && !wcProvider.session) return false;
+      await wcProvider.enable();
+
+      const web3Provider = new ethers.BrowserProvider(wcProvider);
+      const network = await web3Provider.getNetwork();
+      if (Number(network.chainId) !== chainIdDec) {
+        showToast('error', 'Please switch WalletConnect wallet to Coston2');
+        return false;
+      }
+
+      const web3Signer = await web3Provider.getSigner();
+      const address = await web3Signer.getAddress();
+      await initializeConnectedWallet({
+        address,
+        web3Provider,
+        web3Signer,
+        method: 'walletconnect',
+        wcProvider
+      });
+      return true;
+    } catch (err) {
+      if (!silent) {
+        console.error('WalletConnect connection failed:', err);
+        showToast('error', 'WalletConnect failed: ' + (err.message || 'Unknown error'));
+      }
+      return false;
+    }
+  };
+
+  // Wallet connection
+  const connectWallet = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      const ok = await connectInjectedWallet(true);
+      if (ok) return;
+    }
+
+    showToast('info', 'Opening WalletConnect...');
+    const wcOk = await connectWalletConnect(false);
+    if (!wcOk) {
+      showToast('error', 'Unable to connect wallet');
     }
   };
 
@@ -1893,15 +1968,18 @@ const syncToFlare = async () => {
   // Auto-reconnect wallet on page load
   useEffect(() => {
     const autoConnect = async () => {
-      if (typeof window.ethereum !== 'undefined') {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts && accounts.length > 0) {
-            connectWallet();
-          }
-        } catch (err) {
-          console.log('Auto-connect check failed:', err);
+      try {
+        const lastMethod = typeof window !== 'undefined' ? localStorage.getItem(WALLETCONNECT_METHOD_KEY) : null;
+        if (lastMethod === 'walletconnect') {
+          const restored = await connectWalletConnect(true);
+          if (restored) return;
         }
+
+        if (typeof window.ethereum !== 'undefined') {
+          await connectInjectedWallet(false);
+        }
+      } catch (err) {
+        console.log('Auto-connect check failed:', err);
       }
     };
     autoConnect();
@@ -2037,12 +2115,23 @@ useEffect(() => {
     }
   }, [walletAddress, flareListings]);
 
-  const disconnectWallet = () => {
+  const disconnectWallet = async () => {
+    if (walletConnectProvider) {
+      try {
+        await walletConnectProvider.disconnect();
+      } catch (err) {
+        console.log('WalletConnect disconnect warning:', err?.message || err);
+      }
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(WALLETCONNECT_METHOD_KEY);
+    }
     setConnected(false);
     setWalletAddress('');
     setWalletBalance(0);
     setProvider(null);
     setSigner(null);
+    setWalletConnectProvider(null);
     setContracts({});
     setUserPosition(null);
   };
