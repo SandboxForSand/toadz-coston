@@ -101,6 +101,8 @@ const ToadzFinal = () => {
   const [walletAddress, setWalletAddress] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletConnectProvider, setWalletConnectProvider] = useState(null);
+  const [walletConnectPending, setWalletConnectPending] = useState(false);
+  const [walletConnectUri, setWalletConnectUri] = useState('');
   
   // Mint page - Fox Girls drops in 30 days
   const [isLive, setIsLive] = useState(false);
@@ -275,6 +277,8 @@ const ToadzFinal = () => {
   const inflowSyncInFlightRef = useRef(false);
   const userDataInFlightRef = useRef(false);
   const rentalPricingInFlightRef = useRef(false);
+  const walletConnectUriRef = useRef('');
+  const pendingWalletConnectRef = useRef(null);
   const readProviderRef = useRef(null);
   const merkleCacheRef = useRef({ fetchedAt: 0, data: EMPTY_MERKLE_TREE });
   const [currentNetwork, setCurrentNetwork] = useState('flare'); // 'flare' or 'songbird'
@@ -1532,20 +1536,38 @@ const syncToFlare = async () => {
   };
 
   const connectWalletConnect = async (silent = false) => {
+    let wcProvider = null;
+    let qrTimeout = null;
+    const onDisplayUri = (uri) => {
+      if (!silent) {
+        setWalletConnectUri(uri || '');
+      }
+    };
+
     try {
       if (!WALLETCONNECT_PROJECT_ID) {
         showToast('error', 'WalletConnect is not configured on this build');
         return false;
       }
 
+      if (!silent) {
+        setWalletConnectPending(true);
+        setWalletConnectUri('');
+        qrTimeout = setTimeout(() => {
+          if (!walletConnectUriRef.current) {
+            showToast('error', 'WalletConnect QR did not load. Please retry.');
+          }
+        }, 9000);
+      }
+
       const { default: EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2.22.4');
       const chainIdDec = parseInt(COSTON2_CHAIN.chainId, 16);
-      const wcProvider = await EthereumProvider.init({
+      wcProvider = await EthereumProvider.init({
         projectId: WALLETCONNECT_PROJECT_ID,
         chains: [chainIdDec],
         optionalChains: [chainIdDec],
         rpcMap: { [chainIdDec]: COSTON2_CHAIN.rpcUrls[0] },
-        showQrModal: !silent,
+        showQrModal: false,
         metadata: {
           name: 'ToadzStake',
           description: 'ToadzStake Coston2 testnet',
@@ -1555,6 +1577,14 @@ const syncToFlare = async () => {
       });
 
       if (silent && !wcProvider.session) return false;
+
+      if (!silent) {
+        pendingWalletConnectRef.current = wcProvider;
+        if (typeof wcProvider.on === 'function') {
+          wcProvider.on('display_uri', onDisplayUri);
+        }
+      }
+
       await wcProvider.enable();
 
       const web3Provider = new ethers.BrowserProvider(wcProvider);
@@ -1577,9 +1607,25 @@ const syncToFlare = async () => {
     } catch (err) {
       if (!silent) {
         console.error('WalletConnect connection failed:', err);
-        showToast('error', 'WalletConnect failed: ' + (err.message || 'Unknown error'));
+        const reason = err?.message || err?.reason || 'Unknown error';
+        showToast('error', 'WalletConnect failed: ' + reason);
       }
       return false;
+    } finally {
+      if (qrTimeout) clearTimeout(qrTimeout);
+      if (wcProvider) {
+        try {
+          if (typeof wcProvider.off === 'function') wcProvider.off('display_uri', onDisplayUri);
+          else if (typeof wcProvider.removeListener === 'function') wcProvider.removeListener('display_uri', onDisplayUri);
+        } catch (err) {
+          console.log('WalletConnect listener cleanup warning:', err?.message || err);
+        }
+      }
+      if (!silent) {
+        pendingWalletConnectRef.current = null;
+        setWalletConnectPending(false);
+        setWalletConnectUri('');
+      }
     }
   };
 
@@ -1594,6 +1640,20 @@ const syncToFlare = async () => {
     const wcOk = await connectWalletConnect(false);
     if (!wcOk) {
       showToast('error', 'Unable to connect wallet');
+    }
+  };
+
+  const dismissWalletConnectModal = async () => {
+    setWalletConnectPending(false);
+    setWalletConnectUri('');
+    const pendingProvider = pendingWalletConnectRef.current;
+    pendingWalletConnectRef.current = null;
+    if (pendingProvider) {
+      try {
+        await pendingProvider.disconnect();
+      } catch (err) {
+        console.log('WalletConnect cancel warning:', err?.message || err);
+      }
     }
   };
 
@@ -3298,6 +3358,10 @@ useEffect(() => {
     return () => clearInterval(timer);
   }, [mintTargetDate]);
 
+  useEffect(() => {
+    walletConnectUriRef.current = walletConnectUri;
+  }, [walletConnectUri]);
+
   const pad = (n) => String(n).padStart(2, '0');
   const getRarityColor = (r) => ({ Legendary: '#f59e0b', Epic: '#a855f7', Rare: '#3b82f6', Common: '#6b7280' }[r] || '#6b7280');
 
@@ -3390,6 +3454,119 @@ useEffect(() => {
             padding: 0
           }}
         >✕</button>
+      </div>
+    );
+  };
+
+  const WalletConnectModal = () => {
+    if (!walletConnectPending) return null;
+    const qrSrc = walletConnectUri
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(walletConnectUri)}`
+      : '';
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.82)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 1400,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 380,
+            background: '#101217',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 14,
+            padding: 16
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>WalletConnect</div>
+            <button
+              onClick={dismissWalletConnectModal}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.04)',
+                color: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {walletConnectUri ? (
+            <>
+              <div
+                style={{
+                  width: '100%',
+                  borderRadius: 12,
+                  background: '#fff',
+                  padding: 12,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginBottom: 10
+                }}
+              >
+                <img src={qrSrc} alt="WalletConnect QR" style={{ width: 260, height: 260, maxWidth: '100%' }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', marginBottom: 10 }}>
+                Scan in D&apos;Cent or any WalletConnect-compatible wallet.
+              </div>
+              <button
+                onClick={() => {
+                  if (!walletConnectUri) return;
+                  navigator.clipboard.writeText(walletConnectUri).then(() => {
+                    showToast('success', 'WalletConnect link copied');
+                  }).catch(() => {
+                    showToast('error', 'Failed to copy WalletConnect link');
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  height: 40,
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Copy WalletConnect Link
+              </button>
+            </>
+          ) : (
+            <div
+              style={{
+                height: 240,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.03)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255,255,255,0.72)',
+                fontSize: 13,
+                fontWeight: 600
+              }}
+            >
+              Generating WalletConnect QR...
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -10548,6 +10725,7 @@ useEffect(() => {
 
       {/* Toast Notifications */}
       <Toast />
+      <WalletConnectModal />
       <LegalModal />
 
       {/* NFT Panel */}
