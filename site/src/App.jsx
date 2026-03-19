@@ -3125,41 +3125,24 @@ useEffect(() => {
   })();
 
   const projectedApy = (() => {
-    if (user.lpPosition <= 0 || poolStats.totalWflr <= 0 || inflowHistory.length === 0) {
-      return null;
-    }
+    // Return-based annualization:
+    // return_to_date = (current_value / total_deposited) - 1
+    // annual_factor = 365 / period_days (period = lock time remaining)
+    // apy = (1 + return_to_date) ^ annual_factor - 1
+    if (user.totalDeposited <= 0 || user.totalPosition <= 0) return null;
+
+    const returnToDate = (user.totalPosition / user.totalDeposited) - 1;
+    if (!Number.isFinite(returnToDate) || returnToDate <= 0) return null;
 
     const nowSec = Math.floor(Date.now() / 1000);
-    const trailingWindowSec = 7 * 24 * 60 * 60; // 7 days
-    const positiveEvents = inflowHistory
-      .filter((item) =>
-        Number.isFinite(item?.amountFlr) &&
-        item.amountFlr > 0 &&
-        Number.isFinite(item?.timestamp) &&
-        item.timestamp > 0
-      );
+    const secondsRemaining = user.lockEnd > 0 ? Math.max(0, user.lockEnd - nowSec) : 0;
+    const daysRemainingRaw = secondsRemaining / 86400;
+    // Guardrail near expiry to avoid unrealistic annualization blowups.
+    const annualizationDays = Math.max(7, daysRemainingRaw);
+    const annualFactor = 365 / annualizationDays;
 
-    if (positiveEvents.length === 0) return null;
-
-    const trailingEvents = positiveEvents.filter((item) => item.timestamp >= nowSec - trailingWindowSec);
-    const sampleEvents = trailingEvents.length >= 2 ? trailingEvents : positiveEvents;
-    const sorted = [...sampleEvents].sort((a, b) => a.timestamp - b.timestamp);
-    if (sorted.length === 0) return null;
-
-    const totalPoolInflows = sorted.reduce((sum, item) => sum + item.amountFlr, 0);
-    if (totalPoolInflows <= 0) return null;
-
-    const oldestTs = sorted[0].timestamp;
-    const newestTs = sorted[sorted.length - 1].timestamp;
-    const observedSec = Math.max(3600, Math.max(newestTs - oldestTs, nowSec - oldestTs)); // minimum 1 hour
-
-    const annualizedPoolInflows = totalPoolInflows * (365 * 24 * 60 * 60 / observedSec);
-    const userShare = Math.max(0, Math.min(1, user.lpPosition / poolStats.totalWflr));
-    const annualizedUserInflows = annualizedPoolInflows * userShare;
-    const basePosition = Math.max(user.totalPosition, user.totalDeposited, 0);
-    if (basePosition <= 0) return null;
-
-    const apyPct = (annualizedUserInflows / basePosition) * 100;
+    const apy = Math.pow(1 + returnToDate, annualFactor) - 1;
+    const apyPct = apy * 100;
     if (!Number.isFinite(apyPct) || apyPct < 0) return null;
 
     return {
