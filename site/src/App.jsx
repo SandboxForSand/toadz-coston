@@ -230,10 +230,11 @@ const ToadzFinal = () => {
   }, [userName]);
 
   const isDesktop = windowWidth >= 768;
-  const inflowCacheKey = `toadz_inflow_history_v4_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}`;
-  const INFLOW_CHUNK_SIZE = 30;
-  const INFLOW_LOOKBACK_BLOCKS = 360;
-  const INFLOW_MAX_ITEMS = 12;
+  const inflowWalletKey = (walletAddress || 'disconnected').toLowerCase();
+  const inflowCacheKey = `toadz_inflow_history_v5_${COSTON2_CHAIN.chainId}_${CONTRACTS.ToadzStake.toLowerCase()}_${CONTRACTS.Buffer.toLowerCase()}_${inflowWalletKey}`;
+  const INFLOW_CHUNK_SIZE = 2000;
+  const INFLOW_BACKFILL_BLOCKS = 300000;
+  const INFLOW_MAX_ITEMS = 500;
 
   // Contract state
   const [provider, setProvider] = useState(null);
@@ -1949,13 +1950,27 @@ const syncToFlare = async () => {
       };
 
       let nextHistory = [...existingHistory];
-      // Fast mode: only scan a tight recent window so refresh stays instant.
-      const fromRecentBlock = Math.max(0, latestBlock - INFLOW_LOOKBACK_BLOCKS + 1);
       const recentEntries = [];
-      for (let fromBlock = fromRecentBlock; fromBlock <= latestBlock; fromBlock += INFLOW_CHUNK_SIZE) {
-        const toBlock = Math.min(latestBlock, fromBlock + INFLOW_CHUNK_SIZE - 1);
-        const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
-        recentEntries.push(...chunkEntries);
+      const cachedLatestBlock = existingHistory.reduce(
+        (max, item) => Math.max(max, Number(item?.blockNumber || 0)),
+        0
+      );
+
+      if (cachedLatestBlock > 0 && cachedLatestBlock < latestBlock) {
+        for (let fromBlock = cachedLatestBlock + 1; fromBlock <= latestBlock; fromBlock += INFLOW_CHUNK_SIZE) {
+          const toBlock = Math.min(latestBlock, fromBlock + INFLOW_CHUNK_SIZE - 1);
+          const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
+          recentEntries.push(...chunkEntries);
+        }
+      } else if (cachedLatestBlock === 0) {
+        const minBackfillBlock = Math.max(0, latestBlock - INFLOW_BACKFILL_BLOCKS + 1);
+        let toBlock = latestBlock;
+        while (toBlock >= minBackfillBlock && recentEntries.length < INFLOW_MAX_ITEMS) {
+          const fromBlock = Math.max(minBackfillBlock, toBlock - INFLOW_CHUNK_SIZE + 1);
+          const chunkEntries = await fetchChunkEntries(fromBlock, toBlock);
+          recentEntries.push(...chunkEntries);
+          toBlock = fromBlock - 1;
+        }
       }
 
       const unique = new Map();
@@ -2007,8 +2022,12 @@ const syncToFlare = async () => {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            inflowHistoryRef.current = parsed;
-            setInflowHistory(parsed);
+            const cachedHistory = parsed
+              .filter((item) => item?.id)
+              .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex)
+              .slice(0, INFLOW_MAX_ITEMS);
+            inflowHistoryRef.current = cachedHistory;
+            setInflowHistory(cachedHistory);
           }
         }
       } catch (err) {
