@@ -256,8 +256,20 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         _seedDelegation(amount);
     }
 
+    function seedDelegationNative() external payable nonReentrant {
+        _seedDelegationNative(msg.value);
+    }
+
     function withdrawOwnSeed(uint256 amount) external {
         _withdrawOwnSeed(amount);
+    }
+
+    function withdrawSeedNative(uint256 amount) external onlyOwner nonReentrant {
+        _withdrawOwnSeedNative(amount);
+    }
+
+    function withdrawOwnSeedNative(uint256 amount) external nonReentrant {
+        _withdrawOwnSeedNative(amount);
     }
 
     function getTotalDelegated() external view returns (uint256 total, uint256 staked, uint256 seed) {
@@ -833,7 +845,12 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         totalDeposited[user] = amount;
     }
     
-    receive() external payable {}
+    receive() external payable {
+        if (msg.sender == address(wflr)) {
+            return;
+        }
+        _seedDelegationNative(msg.value);
+    }
 
     function _seedDelegation(uint256 amount) internal {
         require(amount > 0, "Zero amount");
@@ -844,6 +861,16 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         emit SeedDeposited(amount, seedBalance);
     }
 
+    function _seedDelegationNative(uint256 amount) internal {
+        require(amount > 0, "Zero amount");
+        require(msg.sender == owner() || approvedSeeders[msg.sender], "Not approved seeder");
+        IWFLR(address(wflr)).deposit{value: amount}();
+        seedBalance += amount;
+        seederBalances[msg.sender] += amount;
+        emit NativeFLRWrapped(amount);
+        emit SeedDeposited(amount, seedBalance);
+    }
+
     function _withdrawOwnSeed(uint256 amount) internal {
         require(amount > 0, "Zero amount");
         require(seederBalances[msg.sender] >= amount, "Exceeds seeder balance");
@@ -851,6 +878,18 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
         seederBalances[msg.sender] -= amount;
         seedBalance -= amount;
         require(wflr.transfer(msg.sender, amount), "Transfer failed");
+        emit SeedWithdrawn(amount, seedBalance);
+    }
+
+    function _withdrawOwnSeedNative(uint256 amount) internal {
+        require(amount > 0, "Zero amount");
+        require(seederBalances[msg.sender] >= amount, "Exceeds seeder balance");
+        require(amount <= seedBalance, "Exceeds seed balance");
+        seederBalances[msg.sender] -= amount;
+        seedBalance -= amount;
+        IWFLR(address(wflr)).withdraw(amount);
+        (bool success, ) = payable(msg.sender).call{ value: amount }("");
+        require(success, "Native transfer failed");
         emit SeedWithdrawn(amount, seedBalance);
     }
 }
