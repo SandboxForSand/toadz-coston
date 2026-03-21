@@ -80,6 +80,10 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     
     // V7: Zap contract for single-tx deposits
     address public zapContract;
+
+    // V8: Multi-seeder support for delegated subsidy
+    mapping(address => bool) public approvedSeeders;
+    mapping(address => uint256) public seederBalances;
     
     event Deposited(address indexed user, uint256 wflrAmount, uint256 pondAmount, uint256 lockDays, uint256 multiplier);
     event Restaked(address indexed user, uint256 newWflrStaked, uint256 pondBuyback, uint256 newLockDays);
@@ -94,6 +98,7 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     event SeedDeposited(uint256 amount, uint256 newSeedBalance);
     event SeedWithdrawn(uint256 amount, uint256 newSeedBalance);
     event AddedToStake(address indexed user, uint256 wflrAdded, uint256 pondAdded, uint256 newTotal, uint256 lockMultiplier);
+    event SeederApprovalUpdated(address indexed seeder, bool approved);
     
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -220,23 +225,41 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    function initializeV8() external reinitializer(8) onlyOwner {
+        address currentOwner = owner();
+        approvedSeeders[currentOwner] = true;
+        if (seedBalance > 0 && seederBalances[currentOwner] == 0) {
+            seederBalances[currentOwner] = seedBalance;
+        }
+        emit SeederApprovalUpdated(currentOwner, true);
+    }
+
+    function setApprovedSeeder(address seeder, bool approved) external onlyOwner {
+        require(seeder != address(0), "Invalid seeder");
+        approvedSeeders[seeder] = approved;
+        emit SeederApprovalUpdated(seeder, approved);
+    }
     
     // ============ V5: Seed Delegation for Boosted Rewards ============
-    
+
     function seedDelegation(uint256 amount) external onlyOwner {
-        require(amount > 0, "Zero amount");
-        require(wflr.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-        seedBalance += amount;
-        emit SeedDeposited(amount, seedBalance);
+        _seedDelegation(amount);
     }
-    
+
     function withdrawSeed(uint256 amount) external onlyOwner {
-        require(amount <= seedBalance, "Exceeds seed balance");
-        seedBalance -= amount;
-        require(wflr.transfer(msg.sender, amount), "Transfer failed");
-        emit SeedWithdrawn(amount, seedBalance);
+        _withdrawOwnSeed(amount);
     }
-    
+
+    function seedDelegationAsApproved(uint256 amount) external {
+        require(approvedSeeders[msg.sender], "Not approved seeder");
+        _seedDelegation(amount);
+    }
+
+    function withdrawOwnSeed(uint256 amount) external {
+        _withdrawOwnSeed(amount);
+    }
+
     function getTotalDelegated() external view returns (uint256 total, uint256 staked, uint256 seed) {
         staked = totalWflrStaked;
         seed = seedBalance;
@@ -811,6 +834,25 @@ contract ToadzStake is Initializable, OwnableUpgradeable, ReentrancyGuardUpgrade
     }
     
     receive() external payable {}
+
+    function _seedDelegation(uint256 amount) internal {
+        require(amount > 0, "Zero amount");
+        require(msg.sender == owner() || approvedSeeders[msg.sender], "Not approved seeder");
+        require(wflr.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        seedBalance += amount;
+        seederBalances[msg.sender] += amount;
+        emit SeedDeposited(amount, seedBalance);
+    }
+
+    function _withdrawOwnSeed(uint256 amount) internal {
+        require(amount > 0, "Zero amount");
+        require(seederBalances[msg.sender] >= amount, "Exceeds seeder balance");
+        require(amount <= seedBalance, "Exceeds seed balance");
+        seederBalances[msg.sender] -= amount;
+        seedBalance -= amount;
+        require(wflr.transfer(msg.sender, amount), "Transfer failed");
+        emit SeedWithdrawn(amount, seedBalance);
+    }
 }
 
 // ============ Interfaces ============
