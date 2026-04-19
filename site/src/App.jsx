@@ -25,6 +25,11 @@ const LISTING_FLR_PER_SLOT = 1000;
 const TADZ_COLLECTION_ADDRESS = String(
   CONTRACTS.TestTadzCollection || '0xbaa8344f4a383796695c1f9f3afe1eaffdcfeae6'
 ).toLowerCase();
+const TADZ_IPFS_BASE = 'https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV';
+const TADZ_ANIMATED_IPFS_BASE = 'https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs';
+const TADZ_RASTER_BASE = 'https://images.weserv.nl/?url=ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV';
+const getTadzImageUrl = (tokenId) => `${TADZ_RASTER_BASE}/${tokenId}.svg&output=png`;
+const getTadzAnimatedUrl = (tokenId) => `${TADZ_ANIMATED_IPFS_BASE}/${tokenId}_animated.svg`;
 const BOOST_NFT_FETCH_CHUNK = 30;
 const BOOST_NFT_CACHE_TTL_MS = 5 * 60 * 1000;
 const OG_LOCK_BATCH_SIZE = 40;
@@ -867,7 +872,7 @@ const ToadzFinal = () => {
 
   // Fetch rarity ranks on mount
   useEffect(() => {
-    fetch('https://ipfs.io/ipfs/bafybeib4xvjclo334wse7zdfryfnve6vfaqrb3xk7hczylhbn5rajen4bm')
+    fetch('https://dweb.link/ipfs/bafybeib4xvjclo334wse7zdfryfnve6vfaqrb3xk7hczylhbn5rajen4bm')
       .then(res => res.json())
       .then(data => setRarityRanks(data))
       .catch(err => console.log('Rarity ranks not loaded:', err));
@@ -877,7 +882,7 @@ const ToadzFinal = () => {
   useEffect(() => {
     if (nftDetailModal && nftDetailModal.collection?.toLowerCase() === TADZ_COLLECTION_ADDRESS) {
       setFetchingMetadata(true);
-      fetch(`https://ipfs.io/ipfs/QmZchogrQg5oxnKA8azWPS6YtnGXyb6XsgWXt4kw7tuYby/${nftDetailModal.tokenId}.json`)
+      fetch(`https://dweb.link/ipfs/QmZchogrQg5oxnKA8azWPS6YtnGXyb6XsgWXt4kw7tuYby/${nftDetailModal.tokenId}.json`)
         .then(res => res.json())
         .then(data => {
           setNftMetadata(data);
@@ -1098,7 +1103,7 @@ const ToadzFinal = () => {
       collection: nft.address,
       collectionName: listModalCollection.name,
       tokenId: Number(nft.tokenId),
-      image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`
+      image: getTadzImageUrl(nft.tokenId)
     });
     const warmBoostNfts = userBoostNfts
       .filter((n) => String(n.address || '').toLowerCase() === collectionAddress)
@@ -3741,7 +3746,7 @@ useEffect(() => {
             border: 'none', cursor: 'pointer', position: 'relative'
           }}
         >
-          <img src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${user.pfpTokenId}.svg`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={getTadzImageUrl(user.pfpTokenId)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           <span style={{
             position: 'absolute', bottom: -2, right: -2,
             width: 16, height: 16, borderRadius: 8,
@@ -3943,7 +3948,7 @@ useEffect(() => {
             width: 40, height: 40, borderRadius: 10,
             overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}><img src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${user.pfpTokenId}.svg`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+          }}><img src={getTadzImageUrl(user.pfpTokenId)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: -0.3 }}>{formatAddress(walletAddress)}</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
@@ -4980,8 +4985,8 @@ useEffect(() => {
             filteredListings.map((listing, i) => {
               const durationFactor = listing.commitmentDays / 100;
               const calculatedBoost = Math.min(5.0, 1 + durationFactor);
-              const nftImage = `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${listing.tokenId}.svg`;
-              const animatedUrl = `https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs/${listing.tokenId}_animated.svg`;
+              const nftImage = getTadzImageUrl(listing.tokenId);
+              const animatedUrl = getTadzAnimatedUrl(listing.tokenId);
               const isOwner = walletAddress && listing.seller.toLowerCase() === walletAddress.toLowerCase();
               const nowSeconds = Math.floor(Date.now() / 1000);
               const elapsedDays = listing.listedAt > 0 ? Math.floor((nowSeconds - listing.listedAt) / 86400) : 0;
@@ -5461,7 +5466,7 @@ useEffect(() => {
                 const nowSec = Math.floor(Date.now() / 1000);
                 const daysLeft = rental.rentalExpiry ? Math.max(0, Math.ceil((rental.rentalExpiry - nowSec) / 86400)) : 0;
                 const boost = Math.min(5.0, 1 + rental.commitmentDays / 100);
-                const nftImage = `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${rental.tokenId}.svg`;
+                const nftImage = getTadzImageUrl(rental.tokenId);
                 
                 return (
                   <div key={i} style={{
@@ -5604,8 +5609,8 @@ useEffect(() => {
                       onClick={() => setNftDetailModal({
                         tokenId: nft.tokenId,
                         collection: nft.address,
-                        image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`,
-                        animatedUrl: `https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs/${nft.tokenId}_animated.svg`,
+                        image: getTadzImageUrl(nft.tokenId),
+                        animatedUrl: getTadzAnimatedUrl(nft.tokenId),
                         rank,
                         owner: walletAddress
                       })}
@@ -5619,7 +5624,7 @@ useEffect(() => {
                       }}
                     >
                       <img 
-                        src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`}
+                        src={getTadzImageUrl(nft.tokenId)}
                         style={{ 
                           width: '100%', 
                           aspectRatio: '1', 
@@ -5743,8 +5748,8 @@ useEffect(() => {
                     onClick={() => setNftDetailModal({
                       tokenId: tokenId.toString(),
                       collection: TADZ_COLLECTION_ADDRESS,
-                      image: `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${tokenId}.svg`,
-                      animatedUrl: `https://ipfs.io/ipfs/QmUXYhSJYDPGWmxN5FCZ6Ebc8EVEzUTnZiaNfcrtGZyYZs/${tokenId}_animated.svg`,
+                      image: getTadzImageUrl(tokenId),
+                      animatedUrl: getTadzAnimatedUrl(tokenId),
                       rank: Math.floor(tokenId * 0.24) + 1000
                     })}
                     style={{
@@ -5768,7 +5773,7 @@ useEffect(() => {
                     }}
                   >
                     <img
-                      src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${tokenId}.svg`}
+                      src={getTadzImageUrl(tokenId)}
                       alt={`Tadz #${tokenId}`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       loading="lazy"
@@ -6030,7 +6035,7 @@ useEffect(() => {
                       }}
                     >
                       <img 
-                        src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${nft.tokenId}.svg`}
+                        src={getTadzImageUrl(nft.tokenId)}
                         style={{ 
                           width: '100%', 
                           aspectRatio: '1', 
@@ -6101,7 +6106,7 @@ useEffect(() => {
                     marginBottom: 16
                   }}>
                     <img 
-                      src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${selectedBoostNft?.tokenId || 0}.svg`}
+                      src={getTadzImageUrl(selectedBoostNft?.tokenId || 0)}
                       style={{ width: isDesktop ? 40 : 32, height: isDesktop ? 40 : 32, borderRadius: 4 }}
                     />
                     <div>
@@ -6305,7 +6310,7 @@ useEffect(() => {
                     marginBottom: 16
                   }}>
                     <img 
-                      src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${selectedBoostNft?.tokenId || 0}.svg`}
+                      src={getTadzImageUrl(selectedBoostNft?.tokenId || 0)}
                       style={{ width: isDesktop ? 40 : 32, height: isDesktop ? 40 : 32, borderRadius: 4 }}
                     />
                     <div>
@@ -6550,7 +6555,7 @@ useEffect(() => {
     const listing = selectedRentalListing;
     const dailyRate = parseFloat(listing.dailyRate);
     const boost = Math.min(5.0, 1 + listing.commitmentDays / 100);
-    const nftImage = `https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${listing.tokenId}.svg`;
+    const nftImage = getTadzImageUrl(listing.tokenId);
     const rentEstimate = getRentalEstimateForListing(listing);
     const marketEstimate = getMarketBaselineEstimateForListing(listing);
     const rentBlocked = Boolean(connected && rentEstimate && rentEstimate.netPerDay < 0);
@@ -10588,7 +10593,7 @@ useEffect(() => {
                   width: isDesktop ? 34 : 32, height: isDesktop ? 34 : 32, borderRadius: isDesktop ? 10 : 8,
                   overflow: 'hidden',
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}><img src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${user.pfpTokenId}.svg`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                }}><img src={getTadzImageUrl(user.pfpTokenId)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{formatAddress(walletAddress)}</span>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>▼</span>
               </button>
@@ -10780,7 +10785,7 @@ useEffect(() => {
                 boxShadow: '0 8px 32px rgba(0,255,136,0.2)'
               }}>
                 <img 
-                  src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${user.pfpTokenId}.svg`} 
+                  src={getTadzImageUrl(user.pfpTokenId)} 
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                 />
               </div>
@@ -10812,7 +10817,7 @@ useEffect(() => {
                   }}
                 >
                   <img 
-                    src={`https://ipfs.io/ipfs/QmYDFp59fFKneWigoXuphmvdmW2CqoDQxoaDEkS1fGB4zV/${tokenId}.svg`} 
+                    src={getTadzImageUrl(tokenId)} 
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                   />
                 </button>
