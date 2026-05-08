@@ -254,6 +254,7 @@ const ToadzFinal = () => {
     cap: 0,
     totalPGS: 0,
     totalFtsoRewards: 0,
+    totalPaid: 0,
     topStakerReturn: 0
   });
   const [boostData, setBoostData] = useState({ boost: 0, stakedNfts: [] });
@@ -1294,18 +1295,67 @@ const ToadzFinal = () => {
         pond.getCurrentPrice().catch(() => ethers.parseEther("0.5"))
       ]);
 
-      // Top staker return - skip indexer on testnet
-      let topReturn = 0;
+      const totalWflrNum = Number(ethers.formatEther(totalWflr));
+      const totalPondNum = Number(ethers.formatEther(totalPond));
+      const capNum = Number(ethers.formatEther(cap));
+      const totalPGSNum = Number(ethers.formatEther(totalPGS));
+      const totalFtsoRewardsNum = Number(ethers.formatEther(stakeFtso)) + Number(ethers.formatEther(bufferFtso));
 
-      setPoolStats({
+      setPoolStats((prev) => ({
+        ...prev,
         pondPrice: Number(ethers.formatEther(pondPrice)),
-        totalWflr: Number(ethers.formatEther(totalWflr)),
-        totalPond: Number(ethers.formatEther(totalPond)),
-        cap: Number(ethers.formatEther(cap)),
-        totalPGS: Number(ethers.formatEther(totalPGS)),
-        totalFtsoRewards: Number(ethers.formatEther(stakeFtso)) + Number(ethers.formatEther(bufferFtso)),
-        topStakerReturn: topReturn
-      });
+        totalWflr: totalWflrNum,
+        totalPond: totalPondNum,
+        cap: capNum,
+        totalPGS: totalPGSNum,
+        totalFtsoRewards: totalFtsoRewardsNum,
+      }));
+
+      void (async () => {
+        try {
+          const stakersRes = await fetch('https://toadz-indexer-production.up.railway.app/api/stakers');
+          const stakers = await stakersRes.json();
+          const allStakers = Array.isArray(stakers) ? [...new Set(stakers)] : [];
+          let totalCurrentGains = 0;
+          let topReturn = 0;
+
+          const summaries = await Promise.all(allStakers.map(async (staker) => {
+            try {
+              const [position, pendingRewards, totalDeposited] = await Promise.all([
+                toadzStake.positions(staker),
+                toadzStake.getPendingRewards(staker),
+                toadzStake.totalDeposited(staker),
+              ]);
+              const deposited = Number(ethers.formatEther(totalDeposited));
+              const principalWithPending = Number(ethers.formatEther(position[0] + pendingRewards));
+              const earnedYield = Number(ethers.formatEther(position[2]));
+              const totalPosition = principalWithPending + earnedYield;
+              if (principalWithPending <= 0 && deposited <= 0) return null;
+              const totalEarned = Math.max(0, totalPosition - deposited);
+              const gainPct = deposited > 0 ? (totalEarned / deposited) * 100 : 0;
+              return { totalEarned, gainPct };
+            } catch (_) {
+              return null;
+            }
+          }));
+
+          for (const item of summaries) {
+            if (!item) continue;
+            totalCurrentGains += Number(item.totalEarned || 0);
+            if (Number.isFinite(item.gainPct)) {
+              topReturn = Math.max(topReturn, Number(item.gainPct));
+            }
+          }
+
+          setPoolStats((prev) => ({
+            ...prev,
+            totalPaid: totalCurrentGains,
+            topStakerReturn: topReturn,
+          }));
+        } catch (e) {
+          console.log('Could not fetch main staker gain stats from indexer:', e);
+        }
+      })();
     } catch (err) {
       console.error('Failed to load public stats:', err);
     }
@@ -1731,16 +1781,15 @@ const syncToFlare = async () => {
       setWalletBalance(Number(ethers.formatEther(nativeBal + wflrBal)));
       
       // Get pool stats
-      const topReturn = 0; // Skip indexer on testnet
-      setPoolStats({
+      setPoolStats((prev) => ({
+        ...prev,
         pondPrice: Number(ethers.formatEther(pondPrice)),
         totalWflr: Number(ethers.formatEther(totalWflr)),
         totalPond: Number(ethers.formatEther(totalPond)),
         cap: Number(ethers.formatEther(cap)),
         totalPGS: Number(ethers.formatEther(totalPGS)),
         totalFtsoRewards: Number(ethers.formatEther(stakeFtso)) + Number(ethers.formatEther(bufferFtso)),
-        topStakerReturn: topReturn
-      });
+      }));
       
       // Get boost (may fail on Coston2 if ogVaultOracle is not a contract)
       const boost = await boostRegistryRead.getUserBoost(address).catch(() => null);
@@ -3182,7 +3231,7 @@ useEffect(() => {
     isCapped: poolStats.cap > 0 && poolStats.totalWflr >= poolStats.cap,
     principalGrowthPct: poolStats.totalWflr > 0 ? (poolStats.totalPGS / poolStats.totalWflr * 100).toFixed(1) : '0',
     yieldPct: poolStats.totalWflr > 0 ? (poolStats.totalFtsoRewards / poolStats.totalWflr * 100).toFixed(1) : '0',
-    totalPaid: poolStats.totalPGS + poolStats.totalFtsoRewards,
+    totalPaid: poolStats.totalPaid || 0,
     topStakerPct: (poolStats.topStakerReturn || 0).toFixed(1)
   };
 
@@ -8738,7 +8787,7 @@ useEffect(() => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{poolInfo.totalPaid > 0 ? (poolInfo.totalPaid >= 1000 ? (poolInfo.totalPaid / 1000).toFixed(0) + 'K' : poolInfo.totalPaid.toFixed(0)) : '0'}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>total paid</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>live user gains</div>
             </div>
           </div>
         </div>
